@@ -1,1 +1,1 @@
-
+Validation Failed: One or both required files (util_commons.py, Output.py) are missing from the repository. Migration validation could not be performed. Please ensure both files are present and contain the relevant logger migration code before re-running the validation process.
