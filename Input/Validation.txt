@@ -1,19 +1,20 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 650
-Lines in Output File: 87
-Matching Structures: 7
-Different Structures: 2
-Migration Completed: 78%
-Migration Remaining: 22%
+Lines in Reference File: 624
+Lines in Output File: 98
+Matching Structures: 13
+Different Structures: 5
+Migration Completed: 72%
+Migration Remaining: 28%
 Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
-Detected logging pattern: Databricks logger implemented, Splunk logger removed, Databricks logger initialization and flush block present.
-Migration verification result: Databricks logger migration is present, but not all reference functions and wrappers are migrated. Splunk HTTP calls and requests.post are removed. Major functions (get_delta_data, log_and_load_data, process_event) exist, but wrappers and additional business logic from reference are missing.
+Detected logging pattern: Databricks logger class with buffer and flush, logger initialization, log(), flush(), close(), exit flush block, no Splunk HTTP calls, no requests.post(), no Splunk endpoints.
+Migration verification result: Databricks logger migration is present, but not all wrapper functions and major business logic functions from reference file are migrated. Some functions (write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, etc.) are missing or not fully implemented. Logging wrapper functions (debug, info, warn, error, fatal) are not present as standalone wrappers.
 Issues found:
-- Missing advanced logging wrapper functions (debug, info, warn, error, fatal).
-- Missing additional business logic and data processing functions from reference.
-- Only core logger and basic functions migrated; full structure and utility functions not present.
+- Missing major functions from reference file (write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, etc.)
+- Logging wrapper functions (debug/info/warn/error/fatal) not implemented as in reference
+- Only partial migration of business logic
+- Migration completion below 90%
 
