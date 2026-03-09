@@ -1,20 +1,21 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 520
+Lines in Reference File: 495
 Lines in Output File: 110
-Matching Structures: 22
-Different Structures: 8
-Migration Completed: 73%
-Migration Remaining: 27%
-Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
+Matching Structures: 18
+Different Structures: 7
+Migration Completed: 28%
+Migration Remaining: 72%
+Validation Status: INCOMPLETE
 
 Validation status: FAIL
-Detected logging pattern: Databricks logger wrapper present, logger.flush() implemented, Splunk HTTP calls removed, atexit flush logic present.
-Migration verification result: Logger migration is partially complete. Major logger wrapper functions (debug, info, warn, error, fatal) are missing in Output.py. Splunk HTTP calls are removed, but logger initialization is not fully aligned with reference. Several major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, log_and_write_data_with_partitions) are missing or incomplete in Output.py.
+Detected logging pattern: SplunkLogger initialization present, Databricks logger wrapper functions missing, logger.flush() implemented, but Splunk HTTP calls commented (not fully removed).
+Migration verification result: Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) missing in Agent-1 output. Logger wrapper functions (debug, info, warn, error, fatal) not implemented. Splunk endpoints not referenced, but requests.post() import removed.
 Issues found:
 - Missing logger wrapper functions (debug, info, warn, error, fatal)
-- Missing major functional blocks (get_delta_data, log_and_load_data, write_parquet_data, etc.)
-- Logger initialization not fully aligned with reference
-- Output.py is structurally incomplete compared to reference
+- Major functional blocks (log_and_load_data, write_parquet_data, log_and_write_parquet_data, etc.) absent
+- SplunkLogger initialization present, but migration to Databricks logger incomplete
+- Structural and functional coverage below threshold
 
+PASS/FAIL: FAIL
