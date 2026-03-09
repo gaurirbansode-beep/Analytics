@@ -1,20 +1,13 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 510
-Lines in Output File: 480
-Matching Structures: 450
-Different Structures: 60
-Migration Completed: 88.2%
-Migration Remaining: 11.8%
+Lines in Reference File: 495
+Lines in Output File: 340
+Matching Structures: 27
+Different Structures: 6
+Migration Completed: 82%
+Migration Remaining: 18%
 Validation Status: PARTIALLY MIGRATED
 
 Details:
-- Logger migration: Databricks logger initialization and wrapper functions are present and correctly implemented.
-- Splunk removal: No direct Splunk HTTP calls or requests.post() found; Splunk endpoints not referenced.
-- Function validation: Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) are present in Output.py.
-- Code similarity: High (approx. 90%), minor differences in structure and function signatures.
-- Missing functions: Some utility and wrapper functions from reference are not present in Output.py.
-- Modified functions: Minor changes in logging wrapper and write functions.
-
-Summary: The migration is mostly complete, with logger migration and Splunk removal validated. Some structural and functional differences remain. Status: PARTIALLY MIGRATED.
+- Logger migration is mostly complete: Databricks logger initialization
