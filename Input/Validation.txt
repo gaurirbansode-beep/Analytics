@@ -1,20 +1,21 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 465
-Lines in Output File: 110
-Matching Structures: 18
-Different Structures: 7
-Migration Completed: 72%
-Migration Remaining: 28%
+Lines in Reference File: 570
+Lines in Output File: 520
+Matching Structures: 510
+Different Structures: 60
+Migration Completed: 89.5%
+Migration Remaining: 10.5%
 Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
-Detected logging pattern: Databricks logger initialization present, logger.flush() implemented, Splunk HTTP calls removed, atexit flush block registered.
-Migration verification result: Logger migration partially completed. Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) missing or not fully migrated. Logging wrapper functions and logger methods (debug, info, warn, error, fatal) not fully implemented in Agent-1 output file.
+Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal) present; logger initialization and flush implemented.
+Migration verification result: Databricks logger migration is mostly complete. Splunk direct HTTP calls and requests.post() are removed. Major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, etc.) are present. However, some function signatures and wrapper usages differ from reference. Minor structural differences and missing/modified functions detected.
 Issues found:
-- Several major functions from reference file missing in Agent-1 output file.
-- Logging wrapper functions not present.
-- Logger methods (debug, info, warn, error, fatal) not fully implemented.
-- Code similarity is low; structural and functional migration incomplete.
+- Some wrapper functions and decorator usages differ from reference.
+- Minor differences in logger event structure and function arguments.
+- Additional utility functions present in reference but missing in output.
+- Slight differences in partition handling and error handling blocks.
 
+PASS criteria not met. Please review and align function signatures and wrapper usages for FULLY MIGRATED status.
