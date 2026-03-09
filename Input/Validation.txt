@@ -1,22 +1,20 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 520
-Lines in Output File: 510
-Matching Structures: 480
-Different Structures: 40
-Migration Completed: 92%
-Migration Remaining: 8%
+Lines in Reference File: 510
+Lines in Output File: 480
+Matching Structures: 450
+Different Structures: 60
+Migration Completed: 88.2%
+Migration Remaining: 11.8%
 Validation Status: PARTIALLY MIGRATED
 
 Details:
-- Logger migration is mostly correct: Databricks logger import, initialization, wrapper functions, and flush are present.
-- Splunk HTTP calls and requests.post() are removed; no Splunk endpoints referenced.
-- Major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, etc.) are present and structurally similar.
-- Some functions (e.g., log_and_write_unity_data, write_data_with_partitions) are missing or modified.
-- Code similarity percentage: 91%.
-- Missing functions: log_and_write_unity_data, write_data_with_partitions, update_column_datatype, add_null_app_deployed_uuid.
-- Modified functions: log_and_load_data, write_parquet_data (minor parameter changes).
+- Logger migration: Databricks logger initialization and wrapper functions are present and correctly implemented.
+- Splunk removal: No direct Splunk HTTP calls or requests.post() found; Splunk endpoints not referenced.
+- Function validation: Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) are present in Output.py.
+- Code similarity: High (approx. 90%), minor differences in structure and function signatures.
+- Missing functions: Some utility and wrapper functions from reference are not present in Output.py.
+- Modified functions: Minor changes in logging wrapper and write functions.
 
-Summary:
-The migration is largely complete with minor differences and a few missing/modified functions. Logger migration is correct, Splunk removal is validated, and most functional structures are matched. Migration status: PARTIALLY MIGRATED.
+Summary: The migration is mostly complete, with logger migration and Splunk removal validated. Some structural and functional differences remain. Status: PARTIALLY MIGRATED.
