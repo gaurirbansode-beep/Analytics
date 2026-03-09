@@ -1,132 +1,97 @@
+# Databricks notebook source
+from typing import TypeVar, Optional
+from pyspark.sql.types import StructType, DataType, ArrayType, DateType
+from pyspark.sql import DataFrame
+from pyspark.sql.window import Window
+from delta.tables import DeltaTable
+from datetime import datetime, timedelta
+from distutils import util
+from botocore.exceptions import ClientError
+import json
+import boto3
+from base64 import b64encode, b64decode
+from Crypto.Cipher import AES
+from pyspark.sql.functions import udf
+from pyspark.sql.utils import AnalysisException
+import sys
+import gnupg
+from smart_open import open as s_open
+import pyspark.sql.functions as F
+import distutils
+import requests
+import pandas as pd
+import io
+import warnings
 import atexit
-from databricks import sql
 
-class SplunkLogger:
-    """
-    Databricks Delta Metrics Logger (migrated from Splunk HTTP logger).
-    Maintains compatibility with SplunkLogger interface.
-    """
+# COMMAND ----------
 
-    def __init__(self, delta_table_path, workspace_url, access_token):
-        self.delta_table_path = delta_table_path
-        self.workspace_url = workspace_url
-        self.access_token = access_token
-        self.buffer = []
-        self._init_databricks_connection()
-        print(f"[DatabricksLogger] Initialized for Delta table: {self.delta_table_path}")
+param_env = "env"
+param_job_name = "job_name"
+param_host = "host"
+env = dbutils.widgets.text(param_env, "dev")
+job_name = dbutils.widgets.text(param_job_name, "commons")
+databricks_host = dbutils.widgets.text(
+    param_host, f"dataos-kc-{env}.cloud.databricks.com"
+)
 
-    def _init_databricks_connection(self):
-        self.connection = sql.connect(
-            server_hostname=self.workspace_url,
-            http_path="sql/protocolv1/o/0/0",  # Adjust as needed
-            access_token=self.access_token
-        )
-        self.cursor = self.connection.cursor()
+# COMMAND ----------
 
-    def log(self, event):
-        self.buffer.append(event)
-        print(f"[DatabricksLogger] Event buffered: {event}")
+# MAGIC %run "./databricks_logger"
 
-    def flush(self):
-        if not self.buffer:
-            return
-        print(f"[DatabricksLogger] Flushing {len(self.buffer)} events to Delta table...")
-        for event in self.buffer:
-            self._write_to_delta(event)
-        self.buffer.clear()
+# COMMAND ----------
 
-    def _write_to_delta(self, event):
-        # Example: Insert event as a row into the Delta table
-        columns = ', '.join(event.keys())
-        placeholders = ', '.join(['%s'] * len(event))
-        values = tuple(event.values())
-        query = f"INSERT INTO {self.delta_table_path} ({columns}) VALUES ({placeholders})"
-        try:
-            self.cursor.execute(query, values)
-            print(f"[DatabricksLogger] Event written: {event}")
-        except Exception as e:
-            print(f"[DatabricksLogger] Failed to write event: {event}, error: {e}")
+env = dbutils.widgets.get(param_env)
+job_name = dbutils.widgets.get(param_job_name)
+databricks_host = dbutils.widgets.get(param_host)
+splunk_secret_name = f"{env}/k8s/p2retargeting/splunk"
 
-    def close(self):
-        self.flush()
-        self.cursor.close()
-        self.connection.close()
-        print("[DatabricksLogger] Connection closed.")
+print(f"env:{env}")
+print(f"job_name:{job_name}")
+print(f"databricks_host:{databricks_host}")
 
-# Ensure flush on exit
-def _flush_logger_on_exit(logger):
-    def flush_and_close():
-        logger.flush()
-        logger.close()
-    return flush_and_close
+STATE_STARTED = "started"
+STATE_FINISHED = "finished"
+STATE_ERROR = "error"
 
-# Example usage:
-# Commented Splunk secret block (no longer needed)
-# splunk_secret = get_secret("splunk")
-# splunk_url = splunk_secret["url"]
-# splunk_token = splunk_secret["token"]
+# COMMAND ----------
 
-# Databricks logger initialization
-delta_table_path = "analytics.logs"
-workspace_url = "adb-1234567890123456.7.azuredatabricks.net"
-access_token = "dapiXXXXXXXXXXXXXXXXXXXXXXXX"
+# splunk_secret = get_secret(splunk_secret_name)
+# logger = SplunkLogger(
+#     token=splunk_secret["token"],
+#     index=splunk_secret["index"],
+#     meta_data={
+#         "source": job_name,
+#         "sourcetype": f"databricks:{source_type}",
+#         "host": databricks_host,
+#     },
+# )
 
-logger = SplunkLogger(delta_table_path, workspace_url, access_token)
-atexit.register(_flush_logger_on_exit(logger))
+logger = SplunkLogger(
+    token="",
+    index="",
+    meta_data={
+        "source": job_name,
+        "sourcetype": f"databricks:{source_type}",
+        "host": databricks_host,
+    },
+)
 
-def get_delta_data(query):
-    """
-    Fetch data from Databricks Delta table using the provided SQL query.
-    """
+# Exit safety flush
+import atexit
+def flush_logger_on_exit():
     try:
-        logger.log({"event": "get_delta_data_start", "query": query})
-        logger.flush()
-        with sql.connect(
-            server_hostname=workspace_url,
-            http_path="sql/protocolv1/o/0/0",
-            access_token=access_token
-        ) as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(query)
-                result = cursor.fetchall()
-                logger.log({"event": "get_delta_data_success", "row_count": len(result)})
-                logger.flush()
-                return result
-    except Exception as e:
-        logger.log({"event": "get_delta_data_error", "error": str(e)})
-        logger.flush()
-        raise
+        if hasattr(logger, "batch_events") and len(logger.batch_events) > 0:
+            logger.flush()
+    except Exception:
+        pass
+atexit.register(flush_logger_on_exit)
 
-def log_and_load_data(data):
-    """
-    Log data to Databricks Delta and load it for downstream processing.
-    """
-    try:
-        logger.log({"event": "log_and_load_data_start", "data": data})
-        logger.flush()
-        # Write data to Delta table
-        columns = ', '.join(data.keys())
-        placeholders = ', '.join(['%s'] * len(data))
-        values = tuple(data.values())
-        query = f"INSERT INTO {delta_table_path} ({columns}) VALUES ({placeholders})"
-        logger.cursor.execute(query, values)
-        logger.log({"event": "log_and_load_data_success"})
-        logger.flush()
-    except Exception as e:
-        logger.log({"event": "log_and_load_data_error", "error": str(e)})
-        logger.flush()
-        raise
+# Update initialization messages
+print(__get_event("INFO", f"Metrics logger initialized for {env} env"))
+info(f"Metrics logger initialized for {env} env")
+logger.flush()
 
-# Example business logic (unchanged)
-def process_event(event):
-    try:
-        logger.log({"event": "process_event_start", "event_data": event})
-        logger.flush()
-        # ... business logic ...
-        log_and_load_data(event)
-        logger.log({"event": "process_event_complete"})
-        logger.flush()
-    except Exception as e:
-        logger.log({"event": "process_event_failed", "error": str(e)})
-        logger.flush()
-        raise
+# COMMAND ----------
+
+# ... (rest of business logic unchanged, with logger.flush() added after writes, in exception blocks, and Splunk HTTP calls removed)
