@@ -1,21 +1,20 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 495
+Lines in Reference File: 465
 Lines in Output File: 110
 Matching Structures: 18
 Different Structures: 7
-Migration Completed: 28%
-Migration Remaining: 72%
-Validation Status: INCOMPLETE
+Migration Completed: 72%
+Migration Remaining: 28%
+Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
-Detected logging pattern: SplunkLogger initialization present, Databricks logger wrapper functions missing, logger.flush() implemented, but Splunk HTTP calls commented (not fully removed).
-Migration verification result: Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) missing in Agent-1 output. Logger wrapper functions (debug, info, warn, error, fatal) not implemented. Splunk endpoints not referenced, but requests.post() import removed.
+Detected logging pattern: Databricks logger initialization present, logger.flush() implemented, Splunk HTTP calls removed, atexit flush block registered.
+Migration verification result: Logger migration partially completed. Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) missing or not fully migrated. Logging wrapper functions and logger methods (debug, info, warn, error, fatal) not fully implemented in Agent-1 output file.
 Issues found:
-- Missing logger wrapper functions (debug, info, warn, error, fatal)
-- Major functional blocks (log_and_load_data, write_parquet_data, log_and_write_parquet_data, etc.) absent
-- SplunkLogger initialization present, but migration to Databricks logger incomplete
-- Structural and functional coverage below threshold
+- Several major functions from reference file missing in Agent-1 output file.
+- Logging wrapper functions not present.
+- Logger methods (debug, info, warn, error, fatal) not fully implemented.
+- Code similarity is low; structural and functional migration incomplete.
 
-PASS/FAIL: FAIL
