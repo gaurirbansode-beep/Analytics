@@ -1,17 +1,19 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 570
-Lines in Output File: 540
-Matching Structures: 52
-Different Structures: 6
-Migration Completed: 89%
-Migration Remaining: 11%
-Validation Status: PARTIALLY MIGRATED
+Lines in Reference File: 650
+Lines in Output File: 87
+Matching Structures: 7
+Different Structures: 2
+Migration Completed: 78%
+Migration Remaining: 22%
+Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
-Validation status: PASS
-Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal) are present and correctly implemented. Logger initialization and flush are present. Splunk HTTP calls and requests.post() are removed.
-Migration verification result: Major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_job_start, log_job_skip, log_job_done, load_delta_table, add_cascade_id, get_date_list, get_delta_metrics, etc.) are present and structurally matched. Minor differences detected in some wrapper and partition functions, but core migration is complete.
-Issues found: Some functions from the reference file (e.g., update_column_datatype, add_null_app_deployed_uuid, log_and_write_data_with_partitions) are not present in the migrated file. Minor differences in partition handling and error logging. No Splunk endpoints or requests.post() found.
+Validation status: FAIL
+Detected logging pattern: Databricks logger implemented, Splunk logger removed, Databricks logger initialization and flush block present.
+Migration verification result: Databricks logger migration is present, but not all reference functions and wrappers are migrated. Splunk HTTP calls and requests.post are removed. Major functions (get_delta_data, log_and_load_data, process_event) exist, but wrappers and additional business logic from reference are missing.
+Issues found:
+- Missing advanced logging wrapper functions (debug, info, warn, error, fatal).
+- Missing additional business logic and data processing functions from reference.
+- Only core logger and basic functions migrated; full structure and utility functions not present.
 
-Validation output successfully written and updated in Input/Validation.txt in the Analytics repository.
