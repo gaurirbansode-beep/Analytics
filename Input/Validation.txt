@@ -2,18 +2,18 @@ Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
 Lines in Reference File: 520
-Lines in Output File: 480
-Matching Structures: 44
-Different Structures: 6
-Migration Completed: 88%
-Migration Remaining: 12%
+Lines in Output File: 340
+Matching Structures: 32
+Different Structures: 7
+Migration Completed: 82%
+Migration Remaining: 18%
 Validation Status: PARTIALLY MIGRATED
 
 Validation status: FAIL
-Detected logging pattern: Databricks logger initialization present, Splunk logger block commented out, logger.flush() implemented in most functions.
-Migration verification result: Most logger migration steps are present, but some wrapper functions and error handling blocks are missing logger.flush() calls. Splunk HTTP calls and requests.post() are removed. Some function signatures differ from reference.
+Detected logging pattern: Databricks logger wrapper functions present, logger.flush() implemented, SplunkLogger initialization migrated, exit flush block present.
+Migration verification result: Most logger migration requirements met, but some advanced functions (e.g., log_and_write_delta_table, log_and_write_unity_data, write_data_with_partitions, log_and_write_data_with_partitions, delta_merge_file_status_update) are missing or incomplete in Output.py. Splunk HTTP calls and requests.post() are removed as required.
 Issues found:
-- Some functions (e.g., log_and_write_delta_table, log_and_write_data_with_partitions) are missing or have different signatures.
-- logger.flush() not present in all error blocks.
-- Minor structural differences in wrapper and utility functions.
+- Several advanced functions from the reference file are missing in Output.py.
+- Some wrapper functions lack full error handling and metrics logging as in reference.
+- Output.py does not fully implement partitioned write and delta merge utilities.
 
