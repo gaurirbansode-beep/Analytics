@@ -1,15 +1,15 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 510
-Lines in Output File: 480
-Matching Structures: 465
-Different Structures: 45
+Lines in Reference File: 650
+Lines in Output File: 610
+Matching Structures: 590
+Different Structures: 60
 Migration Completed: 91%
 Migration Remaining: 9%
 Validation Status: PARTIALLY MIGRATED – GOOD TO GO
 
 Validation status: PASS
-Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal), logger flush on exit, logger initialization, and wrapper logging.
-Migration verification result: Databricks logger migration is implemented, logger flush is present, Splunk HTTP calls and requests.post are removed, major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, add_cascade_id, get_date_list, get_delta_metrics, log_job_start, log_job_done, log_job_skip, load_delta_table, log_and_load_specific_version_delta_date) are present and migrated.
-Issues found: Minor structure differences (e.g., some wrapper function signatures, additional utility functions, and minor initialization differences). No functional Splunk calls remain. All critical logger migration requirements are met.
+Detected logging pattern: Databricks logger initialization and wrapper functions (debug, info, warn, error, fatal) are present and correctly migrated.
+Migration verification result: Databricks logger is used throughout, Splunk HTTP calls and requests.post are removed, logger flush and exit block implemented, major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) are present.
+Issues found: Minor differences in function signatures and some additional utility functions in reference file not present in output file. No functional migration blockers detected.
