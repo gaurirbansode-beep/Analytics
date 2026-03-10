@@ -1,9 +1,15 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: kb_util_commons_refrence.py
-
+Lines in Reference File: N/A (file not found)
+Lines in Output File: 500 (approximate)
+Matching Structures: N/A
+Different Structures: N/A
+Migration Completed: 0%
+Migration Remaining: 100%
 Validation Status: INCOMPLETE
 
-Reason: Reference file 'Input/kb_util_commons_refrence.py' could not be found in the repository (404 Not Found).
-
-No migration comparison could be performed. Please ensure the reference file exists and rerun the validation.
+Validation status: FAIL
+Detected logging pattern: Databricks logger present, Splunk logger removed
+Migration verification result: Reference file missing, cannot validate migration
+Issues found: Reference file 'kb_util_commons_refrence.py' not found in repository. Please add the reference file for full validation.
