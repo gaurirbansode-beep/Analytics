@@ -18,10 +18,10 @@ import gnupg
 from smart_open import open as s_open
 import pyspark.sql.functions as F
 import distutils
+import requests
 import pandas as pd
 import io
 import warnings
-import atexit
 
 # COMMAND ----------
 
@@ -36,7 +36,7 @@ databricks_host = dbutils.widgets.text(
 
 # COMMAND ----------
 
-# MAGIC %run "./databricks_logger"
+# MAGIC %run "./splunk_logger"
 
 # COMMAND ----------
 
@@ -55,26 +55,94 @@ STATE_ERROR = "error"
 
 # COMMAND ----------
 
-# --- Databricks logger initialization (migrated) ---
-# splunk_secret = get_secret(splunk_secret_name)
-# logger = SplunkLogger(
-#     token=splunk_secret["token"],
-#     index=splunk_secret["index"],
-#     meta_data={
-#         "source": source_name,
-#         "sourcetype": f"databricks:{source_type}",
-#         "host": databricks_host,
-#     },
-# )
-logger = SplunkLogger(
-    token="",
-    index="",
-    meta_data={
-        "source": job_name,
-        "sourcetype": f"databricks:{'spark-job'}",
-        "host": databricks_host,
-    },
-)
+
+class STSSession:
+    """
+    Class to init a sts session for the given role.
+    How to use:
+      # from lib.sts_session import STSSession
+
+      sts_session = STSSession(arn=<ASSUME_ROLE_ARN>,
+                          session_name=<SESSION_NAME>,
+                          duration=<OPTIONAL_SESSION_DURATION_IN_SECONDS>,
+                          region=<OPTIONAL_AWS_REGION>)
+    """
+
+    def __init__(
+        self, arn, session_name="sts_session", duration=3600, region="us-west-2"
+    ):
+        sts_connection = boto3.client("sts", region)
+        assume_role_object = sts_connection.assume_role(
+            RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration
+        )
+        self.credentials = assume_role_object["Credentials"]
+
+        self.sts_session = boto3.Session(
+            aws_access_key_id=self.credentials["AccessKeyId"],
+            aws_secret_access_key=self.credentials["SecretAccessKey"],
+            aws_session_token=self.credentials["SessionToken"],
+            region_name=region,
+        )
+
+
+# COMMAND ----------
+
+
+class AWSResource:
+    """
+    Class to create objects related to particular services of AWS.
+    How to use:
+        resource = AWSResource(session=<session_name>)
+    """
+
+    def __init__(self, session=boto3.session.Session()):
+        self.s3 = self.get_s3_bucket_object(session)
+
+    def get_s3_bucket_object(self, session):
+        return session.client("s3")
+
+    def refresh_s3_bucket_object(self, session):
+        self.s3 = session.client("s3")
+
+
+# COMMAND ----------
+
+
+def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
+    """
+    Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
+    How to use:
+        # Fetch secrets without assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>)
+
+        # Fetch secrets with assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>,
+        session=sts_session)     # code to initialize STSSession is defined above
+    """
+
+    client = session.client(
+        service_name="secretsmanager",
+        region_name=region_name,
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        raise e
+
+    else:
+        # Secrets Manager decrypts the secret value using the associated KMS CMK
+        # Depending on whether the secret was a string or binary, only one of these fields will be populated
+        if "SecretString" in get_secret_value_response:
+            secret_json = get_secret_value_response["SecretString"]
+            return json.loads(secret_json)
+        else:
+            return get_secret_value_response["SecretBinary"]
+
 
 # COMMAND ----------
 
@@ -108,7 +176,20 @@ print(log_data)
 
 # COMMAND ----------
 
+splunk_secret = get_secret(splunk_secret_name)
+logger = SplunkLogger(
+    token=splunk_secret["token"],
+    index=splunk_secret["index"],
+    meta_data={
+        "source": source_name,
+        "sourcetype": f"databricks:{source_type}",
+        "host": databricks_host,
+    },
+)
+
+
 def __get_event(log_level, msg, data={}):
+    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -117,23 +198,29 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
+
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
+
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
+
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
+
 
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
 
+
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
 
-info(f"Metrics logger initialized for {env} env")
-logger.flush()
+
+print(__get_event("INFO", f"splunk logger initialized for {env} env"))
+info(f"splunk logger initialized for {env} env")
 
 # COMMAND ----------
 
@@ -148,8 +235,10 @@ De-psedonymize: Use the decrypt udf
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
+
 def get_pseudonym_secret(key_type):
     return bytes(pseudonym_secrets[key_type], "utf-8")
+
 
 @udf
 def encrypt(key_type, text):
@@ -158,6 +247,7 @@ def encrypt(key_type, text):
     key = get_pseudonym_secret(key_type)
     block_size = AES.block_size
     cipher = AES.new(key, AES.MODE_ECB)
+    # padding message to a length that is multiple of AES block size
     id1 = bytes(
         (
             text
@@ -166,11 +256,13 @@ def encrypt(key_type, text):
         ),
         encoding="utf8",
     )
+    # instantiate a new AES cipher object
     try:
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
         warn("Error trying to encrypt")
         return None
+
 
 @udf
 def decrypt(key_type, cipher_text):
@@ -185,16 +277,21 @@ def decrypt(key_type, cipher_text):
         warn("Error trying to decrypt")
         return None
 
+
+# for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
     for field, fieldtype in col_map.items():
         out_df = out_df.withColumn(field, encrypt(F.lit(fieldtype), field))
     return out_df
 
+
 # COMMAND ----------
+
 
 class SourceEmptyException(Exception):
     pass
+
 
 def logging_wrapper(task, error_msg):
     def inner(func):
@@ -215,7 +312,6 @@ def logging_wrapper(task, error_msg):
                         "state": STATE_FINISHED,
                     },
                 )
-                logger.flush()
                 return df
             except AnalysisException as e:
                 error(
@@ -226,7 +322,6 @@ def logging_wrapper(task, error_msg):
                         "state": STATE_ERROR,
                     },
                 )
-                logger.flush()
                 if str(e).startswith("Path does not exist:"):
                     raise SourceEmptyException()
                 else:
@@ -241,12 +336,15 @@ def logging_wrapper(task, error_msg):
                         "state": STATE_ERROR,
                     },
                 )
-                logger.flush()
                 raise
+
         return wrapper
+
     return inner
 
+
 # COMMAND ----------
+
 
 def get_parquet_data(
     source: str, partition_string: str = "", retain_partition_columns: bool = "False"
@@ -257,9 +355,8 @@ def get_parquet_data(
         df = spark.read.option("mergeSchema", "true").parquet(source)
     return df
 
-def get_delta_data(source: str, check_on: str = "s3") -> DataFrame:
-    if check_on == "unity":
-        return spark.read.table(source)
+
+def get_delta_data(source: str) -> DataFrame:
     return spark.read.format("delta").load(source)
 
 def get_unity_data(unity_path: str) -> DataFrame:
@@ -273,6 +370,7 @@ def get_csv_data(source: str, separator: str = "|") -> DataFrame:
         .load(source)
     )
 
+
 def get_decrypted_data_from_gpg(source, secret_name):
     secret = get_secret(secret_name)
     gpg = gnupg.GPG(gpgbinary="/usr/bin/gpg")
@@ -280,6 +378,7 @@ def get_decrypted_data_from_gpg(source, secret_name):
     with s_open(source, mode="rb") as file:
         decrypted_data = gpg.decrypt_file(file, passphrase=secret["passphrase"])
     return decrypted_data
+
 
 def get_redshift_data(redshift_constants: dict, create_session: bool) -> DataFrame:
     if create_session == True:
@@ -304,6 +403,7 @@ def get_redshift_data(redshift_constants: dict, create_session: bool) -> DataFra
         .load()
     )
     return df
+
 
 def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
     try:
@@ -337,6 +437,7 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 df = spark.table(source_info["database"] + "." + source_info["table"])
         else:
             df = spark.read.format(source_info["format"]).load(source_info["path"])
+       
         info(
             f"Finished {log_data['task']}",
             data={
@@ -345,7 +446,6 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 "rows": df.count(),
             },
         )
-        logger.flush()
         return df
     except AnalysisException as e:
         error(
@@ -356,7 +456,6 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         if str(e).startswith("Path does not exist:"):
             raise SourceEmptyException()
         else:
@@ -370,8 +469,8 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
+
 
 # COMMAND ----------
 
@@ -383,7 +482,6 @@ def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> 
             .option("compression", "snappy")
             .saveAsTable(destination_path)
         )
-        logger.flush()
     else:
         error(
             "Could not write to destination as dataframe having zero records",
@@ -393,10 +491,10 @@ def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> 
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
+
 
 def log_and_write_parquet_data(
     df: DataFrame, destination_path: str, log_data: dict
@@ -424,7 +522,6 @@ def log_and_write_parquet_data(
                 ),
             },
         )
-        logger.flush()
     except Exception as e:
         error(
             "Could not write to destination",
@@ -435,10 +532,10 @@ def log_and_write_parquet_data(
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
 
 # COMMAND ----------
+
 
 def get_raw_date(raw_date, num_parts):
     processed_date = raw_date.split("-")
@@ -447,12 +544,17 @@ def get_raw_date(raw_date, num_parts):
         dbutils.notebook.exit("Date format does not match run type")
     return processed_date
 
+
 # COMMAND ----------
+
+# DBTITLE 1,To get list of dates
 
 def get_date_list(date_start: str, date_end: str) -> list:
     if (date_start != "") and (date_end != ""):
         date_start_object = datetime.strptime(date_start, "%Y-%m-%d")
         date_end_object = datetime.strptime(date_end, "%Y-%m-%d")
+
+        # this will give you a list containing all of the dates
         date_list = [
             (date_start_object + timedelta(days=x)).strftime("%Y-%m-%d")
             for x in range((date_end_object - date_start_object).days + 1)
@@ -460,6 +562,7 @@ def get_date_list(date_start: str, date_end: str) -> list:
     else:
         date_list = None
     return date_list
+
 
 # COMMAND ----------
 
@@ -481,6 +584,7 @@ def get_delta_metrics(deltaTable: DeltaTable) -> dict:
             .first()
         )
 
+
 def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
     if log_data["df_count"] != 0:
         (
@@ -489,7 +593,6 @@ def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> No
             .option("overwriteSchema", "true")
             .saveAsTable(destination_path)
         )
-        logger.flush()
     else:
         error(
             "Could not write to destination as dataframe having zero records",
@@ -499,10 +602,10 @@ def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> No
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
+
 
 def log_and_write_delta_table(
     df: DataFrame, destination_path: str, log_data: dict
@@ -532,7 +635,6 @@ def log_and_write_delta_table(
             },
         )
         deltaTable.optimize().executeCompaction()
-        logger.flush()
     except Exception as e:
         error(
             f"Could not write to {destination_path}",
@@ -543,31 +645,30 @@ def log_and_write_delta_table(
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
+
 
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
         info(
             f"Checking that delta table exists at {dest_bucket}",
-            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_STARTED},
+            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_STARTED},
         )
         get_delta_data(dest_bucket)
         delta_existed = True
         info(
             f"Done checking that delta table exists at {dest_bucket}",
-            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_FINISHED},
+            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
         )
-        logger.flush()
     except AnalysisException:
         delta_existed = False
         info(
             f"Delta table does not exist at {dest_bucket}",
-            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_FINISHED},
+            data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
         )
-        logger.flush()
     return delta_existed
+
 
 def delta_merge_file_status_update(
     dest_bucket: str, input_df: DataFrame, update_columns: list = None
@@ -577,7 +678,7 @@ def delta_merge_file_status_update(
         deltaTable = DeltaTable.forPath(spark, dest_bucket)
         info(
             f"Upserting into delta table at {dest_bucket}",
-            data={"task": "TASK_UPDATE_DELTA_TABLE", "state": STATE_STARTED},
+            data={"task": TASK_UPDATE_DELTA_TABLE, "state": STATE_STARTED},
         )
         if update_columns:
             (
@@ -589,23 +690,25 @@ def delta_merge_file_status_update(
                 .whenNotMatchedInsertAll()
                 .execute()
             )
+
         info(
             f"Done upserting into delta table at {dest_bucket}",
             data={
-                "task": "TASK_UPDATE_DELTA_TABLE",
+                "task": TASK_UPDATE_DELTA_TABLE,
                 "state": STATE_FINISHED,
                 "metrics": get_delta_metrics(deltaTable),
             },
         )
         deltaTable = DeltaTable.forPath(spark, dest_bucket)
         deltaTable.optimize().executeCompaction()
-        logger.flush()
     elif delta_existed is None:
         raise Exception("Unable to update delta table")
     else:
         log_and_write_delta_table(
-            input_df, dest_bucket, {"task": "TASK_CREATE_DELTA_TABLE"}
+            input_df, dest_bucket, {"task": TASK_CREATE_DELTA_TABLE}
         )
+
+
 
 # COMMAND ----------
 
@@ -621,11 +724,13 @@ def log_and_write_delta_data_with_partition(
                 "state": STATE_STARTED,
             },
         )
+
         df.write.format("delta").mode(mode).partitionBy(
             destination_info["partition_cols"]
         ).option("partitionOverwriteMode", "dynamic").saveAsTable(
             destination_info["destination"]
         )
+
         delta_table = DeltaTable.forName(spark, destination_info["destination"])
         info(
             f"Done writing delta table {destination_info['destination']}",
@@ -636,7 +741,6 @@ def log_and_write_delta_data_with_partition(
             },
         )
         delta_table.optimize().executeCompaction()
-        logger.flush()
     except Exception as e:
         error(
             f"Could not write to {destination_info['destination']}",
@@ -647,7 +751,6 @@ def log_and_write_delta_data_with_partition(
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
 
 # COMMAND ----------
@@ -669,6 +772,7 @@ def write_delta_with_date_partitions(df: DataFrame, job_parameters: dict) -> Non
             .option("partitionOverwriteMode", "dynamic")
             .saveAsTable(job_parameters["destination"])
         )
+
         deltaTable = DeltaTable.forName(spark, job_parameters["destination"])
         deltaTable.optimize().executeCompaction()
         info(
@@ -680,7 +784,6 @@ def write_delta_with_date_partitions(df: DataFrame, job_parameters: dict) -> Non
                 "state": STATE_FINISHED,
             },
         )
-        logger.flush()
     except Exception as e:
         error(
             "Could not write to destination",
@@ -691,7 +794,6 @@ def write_delta_with_date_partitions(df: DataFrame, job_parameters: dict) -> Non
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
 
 # COMMAND ----------
@@ -701,26 +803,27 @@ def log_job_start(job_name: str, task: str) -> None:
         f"Started {job_name} Job",
         data={"task": task, "state": STATE_STARTED},
     )
-    logger.flush()
+
 
 def log_job_skip(job_name: str, task: str) -> None:
     info(
         f"Skipping {job_name} job",
-        data={"task": task, "state": "skipped"},
+        data={"task": task, "state": STATE_SKIPPED},
     )
-    logger.flush()
+
 
 def log_job_done(job_name: str, task: str) -> None:
     info(
         f"Finished {job_name} job",
         data={"task": task, "state": STATE_FINISHED},
     )
-    logger.flush()
 
 # COMMAND ----------
 
+
 def load_delta_table(location: str, schema: StructType) -> DeltaTable:
     try:
+        # checking if delta exists
         return DeltaTable.forPath(spark, location)
     except AnalysisException:
         info("Table doesn't exists. Initializing...", {"location": location})
@@ -729,9 +832,11 @@ def load_delta_table(location: str, schema: StructType) -> DeltaTable:
         ).save(location)
         return DeltaTable.forPath(spark, location)
 
+
 # COMMAND ----------
 
-@logging_wrapper("TASK_LOAD_ALPACA", "Could not load alpaca")
+
+@logging_wrapper(TASK_LOAD_ALPACA, "Could not load alpaca")
 def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
     return (
         get_unity_data(alpaca_source)
@@ -740,6 +845,7 @@ def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
     )
 
 # COMMAND ----------
+
 
 def add_cascade_id(cascade_id_dict: dict) -> DataFrame:
     added_cascade_id_df = cascade_id_dict["source_df"].join(
@@ -753,7 +859,9 @@ def add_cascade_id(cascade_id_dict: dict) -> DataFrame:
 # COMMAND ----------
 
 def get_latest_delta_version_by_date(date_list: list, table_name: str) -> dict:
+   
     delta_table = DeltaTable.forName(spark, table_name)
+
     delta_history = (
         delta_table.history()
         .filter(F.to_date(F.col("timestamp")).isin(date_list))
@@ -781,6 +889,7 @@ def log_and_load_specific_version_delta_date(
             f"Starting {log_data['task']}",
             data={"task": log_data["task"], "state": STATE_STARTED},
         )
+
         df = (
             spark.read.format(source_info.get("format", "delta"))
             .option("versionAsOf", source_info["version"])
@@ -794,7 +903,6 @@ def log_and_load_specific_version_delta_date(
                 "rows": df.count(),
             },
         )
-        logger.flush()
         return df
     except Exception as e:
         error(
@@ -805,16 +913,4 @@ def log_and_load_specific_version_delta_date(
                 "state": STATE_ERROR,
             },
         )
-        logger.flush()
         raise e
-
-# COMMAND ----------
-
-import atexit
-def flush_logger_on_exit():
-    try:
-        if hasattr(logger, "batch_events") and len(logger.batch_events) > 0:
-            logger.flush()
-    except Exception:
-        pass
-atexit.register(flush_logger_on_exit)
