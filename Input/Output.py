@@ -137,45 +137,14 @@ logger.flush()
 
 # COMMAND ----------
 
-class STSSession:
-    def __init__(self, arn, session_name="sts_session", duration=3600, region="us-west-2"):
-        sts_connection = boto3.client("sts", region)
-        assume_role_object = sts_connection.assume_role(
-            RoleArn=arn, SessionName=session_name, DurationSeconds=duration
-        )
-        self.credentials = assume_role_object["Credentials"]
-        self.sts_session = boto3.Session(
-            aws_access_key_id=self.credentials["AccessKeyId"],
-            aws_secret_access_key=self.credentials["SecretAccessKey"],
-            aws_session_token=self.credentials["SessionToken"],
-            region_name=region,
-        )
-
-class AWSResource:
-    def __init__(self, session=boto3.session.Session()):
-        self.s3 = self.get_s3_bucket_object(session)
-    def get_s3_bucket_object(self, session):
-        return session.client("s3")
-    def refresh_s3_bucket_object(self, session):
-        self.s3 = session.client("s3")
-
-def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
-    client = session.client(
-        service_name="secretsmanager",
-        region_name=region_name,
-    )
-    try:
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-    except ClientError as e:
-        raise e
-    else:
-        if "SecretString" in get_secret_value_response:
-            secret_json = get_secret_value_response["SecretString"]
-            return json.loads(secret_json)
-        else:
-            return get_secret_value_response["SecretBinary"]
-
-# COMMAND ----------
+"""
+How to use Pseudonymizaion
+%run "./commons" $env=$env
+Psedonymize: Use the encrypt udf
+  pseudo_df = df.withColumn("deviceId_P", encrypt(lit(<KEY_TO_USE>), <COL_NAME>))
+De-psedonymize: Use the decrypt udf
+  clean_df = pseudo_df.withColumn("deviceId_P", decrypt(lit(<KEY_TO_USE>), <COL_NAME>))
+"""
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
