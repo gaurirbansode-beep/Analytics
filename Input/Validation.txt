@@ -1,21 +1,19 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 570
-Lines in Output File: 520
-Matching Structures: 510
-Different Structures: 60
-Migration Completed: 89.5%
-Migration Remaining: 10.5%
+Lines in Reference File: 560
+Lines in Output File: 470
+Matching Structures: 52
+Different Structures: 8
+Migration Completed: 86.7%
+Migration Remaining: 13.3%
 Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
-Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal) present; logger initialization and flush implemented.
-Migration verification result: Databricks logger migration is mostly complete. Splunk direct HTTP calls and requests.post() are removed. Major functions (get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, etc.) are present. However, some function signatures and wrapper usages differ from reference. Minor structural differences and missing/modified functions detected.
+Detected logging pattern: Databricks logger wrapper functions present, SplunkLogger stub used, logger.flush() implemented, logging methods (debug/info/warn/error/fatal) present.
+Migration verification result: Most logger migration requirements met, but SplunkLogger stub remains, and some wrapper functions differ from reference. Some function signatures and partition handling differ. Direct Splunk HTTP calls removed, requests.post not present, Splunk endpoints not referenced.
 Issues found:
-- Some wrapper functions and decorator usages differ from reference.
-- Minor differences in logger event structure and function arguments.
-- Additional utility functions present in reference but missing in output.
-- Slight differences in partition handling and error handling blocks.
+- SplunkLogger stub remains instead of DatabricksLogger implementation.
+- Some wrapper functions and partition handling differ from reference.
+- Minor differences in function signatures and error handling.
 
-PASS criteria not met. Please review and align function signatures and wrapper usages for FULLY MIGRATED status.
