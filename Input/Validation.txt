@@ -1,8 +1,16 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
-Reference File: kb_util_commons_reference.py
+Reference File: kb_util_commons_refrence.py
 
-Validation Status: FAIL
-Detected logging pattern: N/A
-Migration verification result: INCOMPLETE - Reference file 'Input/kb_util_commons_reference.py' is missing from the repository. Migration validation could not be performed.
-Issues found: Reference file not found. Please provide the correct reference file in the repository to enable validation.
+Lines in Reference File: N/A (File not found)
+Lines in Output File: 480
+Matching Structures: N/A
+Different Structures: N/A
+Migration Completed: 0%
+Migration Remaining: 100%
+Validation Status: INCOMPLETE
+
+Validation status: FAIL
+Detected logging pattern: Unable to validate due to missing reference file
+Migration verification result: FAIL
+Issues found: Reference file 'kb_util_commons_refrence.py' not found in repository. Please provide the correct file for validation.
