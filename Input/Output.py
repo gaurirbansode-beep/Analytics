@@ -42,7 +42,6 @@ databricks_host = dbutils.widgets.text(
 env = dbutils.widgets.get(param_env)
 job_name = dbutils.widgets.get(param_job_name)
 databricks_host = dbutils.widgets.get(param_host)
-splunk_secret_name = f"{env}/k8s/p2retargeting/splunk"
 
 print(f"env:{env}")
 print(f"job_name:{job_name}")
@@ -51,6 +50,7 @@ print(f"databricks_host:{databricks_host}")
 STATE_STARTED = "started"
 STATE_FINISHED = "finished"
 STATE_ERROR = "error"
+STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
 
@@ -129,8 +129,6 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
         raise e
 
     else:
-        # Secrets Manager decrypts the secret value using the associated KMS CMK
-        # Depending on whether the secret was a string or binary, only one of these fields will be populated
         if "SecretString" in get_secret_value_response:
             secret_json = get_secret_value_response["SecretString"]
             return json.loads(secret_json)
@@ -162,6 +160,7 @@ except:
     log_data["job-name"] = f"notebook:{job_name}"
     source_type = "spark-notebook"
     source_name = job_name
+
 log_data["job-run-time"] = job_time
 print(log_data)
 
@@ -181,7 +180,7 @@ logger = SplunkLogger(
     token="",
     index="",
     meta_data={
-        "source": source_name,
+        "source": job_name,
         "sourcetype": f"databricks:{source_type}",
         "host": databricks_host,
     },
@@ -454,12 +453,445 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
         raise e
 
 # COMMAND ----------
-# ... (rest of the file omitted for brevity, but would be included in the actual write)
+
+def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
+    if log_data["df_count"] != 0:
+        (
+            df.write.format("parquet")
+            .mode("overwrite")
+            .option("compression", "snappy")
+            .saveAsTable(destination_path)
+        )
+        logger.flush()
+    else:
+        error(
+            "Could not write to destination as dataframe having zero records",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise Exception(
+            "Could not write to destination as dataframe having zero records"
+        )
+
+def log_and_write_parquet_data(
+    df: DataFrame, destination_path: str, log_data: dict
+) -> None:
+    try:
+        info(
+            f"Uploading {log_data['job_name']}",
+            data={
+                "dest": destination_path,
+                "task": log_data["task"],
+                "state": STATE_STARTED,
+            },
+        )
+        upload_count = df.count()
+        log_data["df_count"] = upload_count
+        write_parquet_data(df, destination_path, log_data)
+        info(
+            f"Done uploading {log_data['job_name']}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "rows": upload_count,
+                "document_type": log_data.get(
+                    "document_type", "Not Applicable For this job"
+                ),
+            },
+        )
+        logger.flush()
+    except Exception as e:
+        error(
+            "Could not write to destination",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
 
 # COMMAND ----------
-# Logger flush on exit
-import atexit
 
+def get_raw_date(raw_date, num_parts):
+    processed_date = raw_date.split("-")
+    if len(processed_date) != num_parts:
+        error("Date format does not match run type")
+        logger.flush()
+        dbutils.notebook.exit("Date format does not match run type")
+    return processed_date
+
+# COMMAND ----------
+
+def get_date_list(date_start: str, date_end: str) -> list:
+    if (date_start != "") and (date_end != ""):
+        date_start_object = datetime.strptime(date_start, "%Y-%m-%d")
+        date_end_object = datetime.strptime(date_end, "%Y-%m-%d")
+        date_list = [
+            (date_start_object + timedelta(days=x)).strftime("%Y-%m-%d")
+            for x in range((date_end_object - date_start_object).days + 1)
+        ]
+    else:
+        date_list = None
+    return date_list
+
+# COMMAND ----------
+
+def get_delta_metrics(deltaTable: DeltaTable) -> dict:
+    try:
+        return json.loads(
+            deltaTable.history(2)
+            .select("timestamp", "operation", "operationParameters", "operationMetrics")
+            .filter(F.col("operation") == "MERGE")
+            .orderBy(F.col("timestamp").desc())
+            .toJSON()
+            .first()
+        )
+    except Exception as e:
+        return json.loads(
+            deltaTable.history(1)
+            .select("timestamp", "operation", "operationParameters", "operationMetrics")
+            .toJSON()
+            .first()
+        )
+
+def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
+    if log_data["df_count"] != 0:
+        (
+            df.write.format("delta")
+            .mode("overwrite")
+            .option("overwriteSchema", "true")
+            .saveAsTable(destination_path)
+        )
+        logger.flush()
+    else:
+        error(
+            "Could not write to destination as dataframe having zero records",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise Exception(
+            "Could not write to destination as dataframe having zero records"
+        )
+
+def log_and_write_delta_table(
+    df: DataFrame, destination_path: str, log_data: dict
+) -> None:
+    try:
+        info(
+            f"Writing delta table at {destination_path}",
+            data={
+                "task": log_data["task"],
+                "destination": destination_path,
+                "state": STATE_STARTED,
+            },
+        )
+        upload_count = df.count()
+        log_data["df_count"] = upload_count
+        write_delta_data(df, destination_path, log_data)
+        deltaTable = DeltaTable.forName(spark, destination_path)
+        info(
+            f"Done writing delta table at {destination_path}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "metrics": get_delta_metrics(deltaTable),
+                "document_type": log_data.get(
+                    "document_type", "Not Applicable For this job"
+                ),
+            },
+        )
+        deltaTable.optimize().executeCompaction()
+        logger.flush()
+    except Exception as e:
+        error(
+            f"Could not write to {destination_path}",
+            data={
+                "task": log_data["task"],
+                "dest": destination_path,
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
+
+# COMMAND ----------
+
+def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
+    delta_existed = None
+    try:
+        info(
+            f"Checking that delta table exists at {dest_bucket}",
+            data={"task": "check_delta_table", "state": STATE_STARTED},
+        )
+        get_delta_data(dest_bucket)
+        delta_existed = True
+        info(
+            f"Done checking that delta table exists at {dest_bucket}",
+            data={"task": "check_delta_table", "state": STATE_FINISHED},
+        )
+        logger.flush()
+    except AnalysisException:
+        delta_existed = False
+        info(
+            f"Delta table does not exist at {dest_bucket}",
+            data={"task": "check_delta_table", "state": STATE_FINISHED},
+        )
+        logger.flush()
+    return delta_existed
+
+def delta_merge_file_status_update(
+    dest_bucket: str, input_df: DataFrame, update_columns: list = None
+) -> None:
+    delta_existed = check_if_delta_exists(dest_bucket)
+    if delta_existed:
+        deltaTable = DeltaTable.forPath(spark, dest_bucket)
+        info(
+            f"Upserting into delta table at {dest_bucket}",
+            data={"task": "update_delta_table", "state": STATE_STARTED},
+        )
+        if update_columns:
+            (
+                deltaTable.alias("status")
+                .merge(input_df.alias("updates"), "status.filename = updates.filename")
+                .whenMatchedUpdate(
+                    set={column: f"updates.{column}" for column in update_columns}
+                )
+                .whenNotMatchedInsertAll()
+                .execute()
+            )
+        info(
+            f"Done upserting into delta table at {dest_bucket}",
+            data={
+                "task": "update_delta_table",
+                "state": STATE_FINISHED,
+                "metrics": get_delta_metrics(deltaTable),
+            },
+        )
+        deltaTable.optimize().executeCompaction()
+        logger.flush()
+    elif delta_existed is None:
+        raise Exception("Unable to update delta table")
+    else:
+        log_and_write_delta_table(
+            input_df, dest_bucket, {"task": "create_delta_table"}
+        )
+
+# COMMAND ----------
+
+def log_and_write_delta_data_with_partition(
+    df: DataFrame, destination_info: dict, log_data: dict, mode: str = "overwrite"
+):
+    try:
+        info(
+            f"Writing delta table {destination_info['destination']}",
+            data={
+                "task": log_data["task"],
+                "destination": destination_info["destination"],
+                "state": STATE_STARTED,
+            },
+        )
+        df.write.format("delta").mode(mode).partitionBy(
+            destination_info["partition_cols"]
+        ).option("partitionOverwriteMode", "dynamic").saveAsTable(
+            destination_info["destination"]
+        )
+        delta_table = DeltaTable.forName(spark, destination_info["destination"])
+        info(
+            f"Done writing delta table {destination_info['destination']}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "metrics": get_delta_metrics(delta_table),
+            },
+        )
+        delta_table.optimize().executeCompaction()
+        logger.flush()
+    except Exception as e:
+        error(
+            f"Could not write to {destination_info['destination']}",
+            data={
+                "task": log_data["task"],
+                "dest": destination_info["destination"],
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
+
+# COMMAND ----------
+
+def write_delta_with_date_partitions(df: DataFrame, job_parameters: dict) -> None:
+    try:
+        info(
+            f"Starting upload_{job_parameters['job_name']}",
+            data={
+                "task": f"upload_{job_parameters['job_name']}",
+                "state": STATE_STARTED,
+            },
+        )
+        upload_count = df.count()
+        (
+            df.write.format("delta")
+            .partitionBy("year", "month", "day")
+            .mode("overwrite")
+            .option("partitionOverwriteMode", "dynamic")
+            .saveAsTable(job_parameters["destination"])
+        )
+        deltaTable = DeltaTable.forName(spark, job_parameters["destination"])
+        deltaTable.optimize().executeCompaction()
+        info(
+            f"Finishing upload_{job_parameters['job_name']}",
+            data={
+                "task": f"upload_{job_parameters['job_name']}",
+                "dest": job_parameters["destination"],
+                "upload_count": upload_count,
+                "state": STATE_FINISHED,
+            },
+        )
+        logger.flush()
+    except Exception as e:
+        error(
+            "Could not write to destination",
+            data={
+                "task": f"upload_{job_parameters['job_name']}",
+                "dump": str(e),
+                "dest": job_parameters["destination"],
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
+
+# COMMAND ----------
+
+def log_job_start(job_name: str, task: str) -> None:
+    info(
+        f"Started {job_name} Job",
+        data={"task": task, "state": STATE_STARTED},
+    )
+    logger.flush()
+
+def log_job_skip(job_name: str, task: str) -> None:
+    info(
+        f"Skipping {job_name} job",
+        data={"task": task, "state": STATE_SKIPPED},
+    )
+    logger.flush()
+
+def log_job_done(job_name: str, task: str) -> None:
+    info(
+        f"Finished {job_name} job",
+        data={"task": task, "state": STATE_FINISHED},
+    )
+    logger.flush()
+
+# COMMAND ----------
+
+def load_delta_table(location: str, schema: StructType) -> DeltaTable:
+    try:
+        return DeltaTable.forPath(spark, location)
+    except AnalysisException:
+        info("Table doesn't exists. Initializing...", {"location": location})
+        spark.createDataFrame(spark.sparkContext.emptyRDD(), schema).write.format(
+            "delta"
+        ).save(location)
+        logger.flush()
+        return DeltaTable.forPath(spark, location)
+
+# COMMAND ----------
+
+@logging_wrapper("TASK_LOAD_ALPACA", "Could not load alpaca")
+def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
+    return (
+        get_unity_data(alpaca_source)
+        .where(F.col("purposeId").isin(purposes))
+        .select(F.col("deviceId").alias("device_uuid"))
+    )
+
+# COMMAND ----------
+
+def add_cascade_id(cascade_id_dict: dict) -> DataFrame:
+    added_cascade_id_df = cascade_id_dict["source_df"].join(
+        cascade_id_dict["profile_df"],
+        cascade_id_dict["source_df"][cascade_id_dict["source_key"]]
+        == cascade_id_dict["profile_df"][cascade_id_dict["profile_key"]],
+        "left",
+    )
+    return added_cascade_id_df.drop(cascade_id_dict["profile_key"])
+
+# COMMAND ----------
+
+def get_latest_delta_version_by_date(date_list: list, table_name: str) -> dict:
+    delta_table = DeltaTable.forName(spark, table_name)
+    delta_history = (
+        delta_table.history()
+        .filter(F.to_date(F.col("timestamp")).isin(date_list))
+        .groupBy(F.to_date(F.col("timestamp")))
+        .max("version")
+        .select(
+            F.col("to_date(timestamp)").alias("time"),
+            F.col("max(version)").alias("version"),
+        )
+        .orderBy(F.col("time"))
+        .collect()
+    )
+    return {
+        history["time"].strftime("%Y-%m-%d"): history["version"]
+        for history in delta_history
+    }
+
+# COMMAND ----------
+
+def log_and_load_specific_version_delta_date(
+    source_info: dict, log_data: dict
+) -> DataFrame:
+    try:
+        info(
+            f"Starting {log_data['task']}",
+            data={"task": log_data["task"], "state": STATE_STARTED},
+        )
+        df = (
+            spark.read.format(source_info.get("format", "delta"))
+            .option("versionAsOf", source_info["version"])
+            .table(source_info["table"])
+        )
+        info(
+            f"Finished {log_data['task']}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "rows": df.count(),
+            },
+        )
+        logger.flush()
+        return df
+    except Exception as e:
+        error(
+            log_data["error_msg"],
+            data={
+                "task": log_data["task"],
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
+
+# COMMAND ----------
+import atexit
 def flush_logger_on_exit():
     try:
         if len(logger.batch_events) > 0:
