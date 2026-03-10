@@ -1,18 +1,21 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 510
-Lines in Output File: 480
-Matching Structures: 470
-Different Structures: 40
-Migration Completed: 92%
-Migration Remaining: 8%
-Validation Status: PARTIALLY MIGRATED – GOOD TO GO
+Lines in Reference File: 627
+Lines in Output File: 495
+Matching Structures: 41
+Different Structures: 6
+Migration Completed: 87.2%
+Migration Remaining: 12.8%
+Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
-Validation status: PASS
-Detected logging pattern: Databricks logger initialization and wrapper functions present, Splunk direct calls removed, logger flush implemented.
-Migration verification result: Databricks logger migration is correct, major functions and wrappers are present, minor differences in function signatures and some additional utility functions in reference file.
-Issues found: Minor differences in function signatures and some utility functions missing in Output.py, but all critical migration requirements are met.
+Validation status: FAIL
+Detected logging pattern: Databricks logger via SplunkLogger wrapper functions (debug/info/warn/error/fatal), logger.flush() on exit
+Migration verification result: Most logger migration requirements are met (logger wrapper functions, flush on exit, Splunk HTTP calls removed, no requests.post, no Splunk endpoints). However, some function wrappers and additional utility functions from the reference are missing or structurally different (e.g., STSSession, AWSResource, some partitioned write utilities, and extra logging wrappers).
+Any issues found:
+- Some utility and logging wrapper functions present in the reference are missing in the migrated file (e.g., STSSession, AWSResource, log_and_write_unity_data, log_and_write_data_with_partitions, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_simpleui_data, etc.).
+- Minor differences in logger initialization and job context handling.
+- Some reference functions use more detailed logging/context.
 
-Input which is migrated file, is written and updated in https://github.com/gaurirbansode-beep/Analytics/blob/main/Input/Output.py in Analytics repository.
-Validation output written and updated in Input/Validation.txt in the Analytics repository.
+Summary:
+The core logger migration is mostly complete, but to achieve FULLY MIGRATED status, additional utility and logging wrapper functions from the reference should be ported and structural differences resolved.
