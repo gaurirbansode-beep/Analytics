@@ -246,6 +246,7 @@ def logging_wrapper(task, error_msg):
                         "state": STATE_FINISHED,
                     },
                 )
+                logger.flush()
                 return df
             except AnalysisException as e:
                 error(
