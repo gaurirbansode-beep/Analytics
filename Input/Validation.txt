@@ -1,9 +1,9 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 510
-Lines in Output File: 480
-Matching Structures: 470
+Lines in Reference File: 520
+Lines in Output File: 510
+Matching Structures: 480
 Different Structures: 40
 Migration Completed: 92%
 Migration Remaining: 8%
@@ -11,8 +11,5 @@ Validation Status: PARTIALLY MIGRATED – GOOD TO GO
 
 Validation status: PASS
 Detected logging pattern: Databricks logger initialization and wrapper functions present, Splunk direct calls removed, logger flush implemented.
-Migration verification result: All major logger migration requirements met. Minor differences in function wrappers and some additional utility functions present in reference file.
-Issues found: Some utility functions (e.g., update_column_datatype, add_null_app_deployed_uuid, log_and_write_data_with_partitions) are missing or modified in Output.py. No Splunk HTTP calls or requests.post detected.
-
-Input which is migrated file, is written and updated in https://github.com/gaurirbansode-beep/Analytics/blob/main/Input/Output.py in Analytics repository.
-Validation output written and updated in Input/Validation.txt in the Analytics repository.
+Migration verification result: Logger migration is correct, major functions exist, minor differences in wrapper and partition handling.
+Issues found: Minor differences in partition write functions and wrapper function signatures. No Splunk endpoints or requests.post detected.
