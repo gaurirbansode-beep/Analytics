@@ -546,7 +546,6 @@ def log_and_write_delta_table(
         logger.flush()
         raise e
 
-
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
