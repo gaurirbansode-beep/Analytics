@@ -21,6 +21,7 @@ import distutils
 import pandas as pd
 import io
 import warnings
+import atexit
 
 # COMMAND ----------
 
@@ -42,6 +43,7 @@ databricks_host = dbutils.widgets.text(
 env = dbutils.widgets.get(param_env)
 job_name = dbutils.widgets.get(param_job_name)
 databricks_host = dbutils.widgets.get(param_host)
+splunk_secret_name = f"{env}/k8s/p2retargeting/splunk"
 
 print(f"env:{env}")
 print(f"job_name:{job_name}")
@@ -54,82 +56,7 @@ STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
 
-class STSSession:
-    """
-    Class to init a sts session for the given role.
-    """
-    def __init__(self, arn, session_name="sts_session", duration=3600, region="us-west-2"):
-        sts_connection = boto3.client("sts", region)
-        assume_role_object = sts_connection.assume_role(
-            RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration
-        )
-        self.credentials = assume_role_object["Credentials"]
-        self.sts_session = boto3.Session(
-            aws_access_key_id=self.credentials["AccessKeyId"],
-            aws_secret_access_key=self.credentials["SecretAccessKey"],
-            aws_session_token=self.credentials["SessionToken"],
-            region_name=region,
-        )
-
-# COMMAND ----------
-
-class AWSResource:
-    """
-    Class to create objects related to particular services of AWS.
-    """
-    def __init__(self, session=boto3.session.Session()):
-        self.s3 = self.get_s3_bucket_object(session)
-    def get_s3_bucket_object(self, session):
-        return session.client("s3")
-    def refresh_s3_bucket_object(self, session):
-        self.s3 = session.client("s3")
-
-# COMMAND ----------
-
-def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
-    client = session.client(
-        service_name="secretsmanager",
-        region_name=region_name,
-    )
-    try:
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-    except ClientError as e:
-        raise e
-    else:
-        if "SecretString" in get_secret_value_response:
-            secret_json = get_secret_value_response["SecretString"]
-            return json.loads(secret_json)
-        else:
-            return get_secret_value_response["SecretBinary"]
-
-# COMMAND ----------
-
-notebook_info = json.loads(
-    dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
-)
-job_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-try:
-    log_data = {}
-    log_data["name"] = job_name
-    log_data["job-id"] = notebook_info["tags"]["jobId"]
-    log_data["job-name"] = notebook_info["tags"]["jobName"]
-    log_data["run-id"] = notebook_info["tags"]["runId"]
-    log_data["run-num"] = notebook_info["tags"]["idInJob"]
-    log_data["job-trigger-type"] = notebook_info["tags"]["jobTriggerType"]
-    source_type = "spark-job"
-    source_name = notebook_info["tags"]["jobName"]
-except:
-    print("Not a job execution")
-    log_data["run-id"] = 0
-    log_data["job-name"] = f"notebook:{job_name}"
-    source_type = "spark-notebook"
-    source_name = job_name
-log_data["job-run-time"] = job_time
-print(log_data)
-
-# COMMAND ----------
-
-# Splunk secret block commented out
+# --- SPLUNK LOGGER MIGRATION BLOCK ---
 # splunk_secret = get_secret(splunk_secret_name)
 # logger = SplunkLogger(
 #     token=splunk_secret["token"],
@@ -140,16 +67,12 @@ print(log_data)
 #         "host": databricks_host,
 #     },
 # )
+logger = SplunkLogger(token='', index='', meta_data={
+    "source": "analytics_room",  # fallback if not a job execution
+    "sourcetype": f"databricks:spark-job",  # fallback
+    "host": databricks_host,
+})
 
-logger = SplunkLogger(
-    token="",
-    index="",
-    meta_data={
-        "source": source_name,
-        "sourcetype": f"databricks:{source_type}",
-        "host": databricks_host,
-    },
-)
 
 def __get_event(log_level, msg, data={}):
     event = {"level": log_level, "message": msg}
@@ -159,6 +82,7 @@ def __get_event(log_level, msg, data={}):
         event["data"] = data
     event.update(log_data)
     return json.dumps(event)
+
 
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
@@ -179,16 +103,39 @@ print(__get_event("INFO", f"Metrics logger initialized for {env} env"))
 info(f"Metrics logger initialized for {env} env")
 logger.flush()
 
+# Ensure logger flushes on exit
+atexit.register(logger.flush)
+
 # COMMAND ----------
 
-"""
-How to use Pseudonymizaion
-%run "./commons" $env=$env
-Psedonymize: Use the encrypt udf
-  pseudo_df = df.withColumn("deviceId_P", encrypt(lit(<KEY_TO_USE>), <COL_NAME>))
-De-psedonymize: Use the decrypt udf
-  clean_df = pseudo_df.withColumn("deviceId_P", decrypt(lit(<KEY_TO_USE>), <COL_NAME>))
-"""
+notebook_info = json.loads(
+    dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
+)
+
+job_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+try:
+    log_data = {}
+    log_data["name"] = job_name
+    log_data["job-id"] = notebook_info["tags"].get("jobId", "")
+    log_data["job-name"] = notebook_info["tags"].get("jobName", "")
+    log_data["run-id"] = notebook_info["tags"].get("runId", "")
+    log_data["run-num"] = notebook_info["tags"].get("idInJob", "")
+    log_data["job-trigger-type"] = notebook_info["tags"].get("jobTriggerType", "")
+    log_data["module_name"] = "analytics_room"
+    source_type = "spark-job"
+    source_name = notebook_info["tags"].get("jobName", job_name)
+except:
+    print("Not a job execution")
+    log_data["run-id"] = 0
+    log_data["job-name"] = f"notebook:{job_name}"
+    source_type = "spark-notebook"
+    source_name = job_name
+
+log_data["job-run-time"] = job_time
+print(log_data)
+
+# COMMAND ----------
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
@@ -214,6 +161,7 @@ def encrypt(key_type, text):
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
         warn("Error trying to encrypt")
+        logger.flush()
         return None
 
 @udf
@@ -227,6 +175,7 @@ def decrypt(key_type, cipher_text):
         return plaintext[: -ord(plaintext[len(plaintext) - 1 :])].decode("utf-8")
     except:
         warn("Error trying to decrypt")
+        logger.flush()
         return None
 
 def pseudonymize(df, col_map):
@@ -246,19 +195,29 @@ def logging_wrapper(task, error_msg):
             try:
                 info(
                     f"Wrapper starting {task}",
-                    data={"task": task, "state": STATE_STARTED},
+                    data={
+                        "task": task,
+                        "state": STATE_STARTED,
+                    },
                 )
                 df = func(*args, **kwargs)
                 info(
                     f"Wrapper finished {task}",
-                    data={"task": task, "state": STATE_FINISHED},
+                    data={
+                        "task": task,
+                        "state": STATE_FINISHED,
+                    },
                 )
                 logger.flush()
                 return df
             except AnalysisException as e:
                 error(
                     error_msg,
-                    data={"task": task, "dump": str(e), "state": STATE_ERROR},
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
                 )
                 logger.flush()
                 if str(e).startswith("Path does not exist:"):
@@ -268,7 +227,12 @@ def logging_wrapper(task, error_msg):
             except:
                 e = sys.exc_info()[0]
                 error(
-                    error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR}
+                    error_msg,
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
                 )
                 logger.flush()
                 raise
@@ -277,17 +241,20 @@ def logging_wrapper(task, error_msg):
 
 # COMMAND ----------
 
-def get_parquet_data(source: str, partition_string: str = "", retain_partition_columns: bool = "False") -> DataFrame:
+def get_parquet_data(
+    source: str, partition_string: str = "", retain_partition_columns: bool = "False"
+) -> DataFrame:
     if retain_partition_columns:
         df = spark.read.option("basePath", source).parquet(source + partition_string)
     else:
         df = spark.read.option("mergeSchema", "true").parquet(source)
     return df
 
-def get_delta_data(source: str, check_on: str = "s3") -> DataFrame:
-    if check_on == "unity":
+def get_delta_data(source: str, format_type: str = "delta") -> DataFrame:
+    if format_type == "unity":
         return spark.read.table(source)
-    return spark.read.format("delta").load(source)
+    else:
+        return spark.read.format("delta").load(source)
 
 def get_unity_data(unity_path: str) -> DataFrame:
     return spark.read.table(unity_path)
@@ -574,27 +541,25 @@ def log_and_write_delta_table(
         logger.flush()
         raise e
 
-# COMMAND ----------
-
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
         info(
             f"Checking that delta table exists at {dest_bucket}",
-            data={"task": "check_delta_table", "state": STATE_STARTED},
+            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_STARTED},
         )
         get_delta_data(dest_bucket)
         delta_existed = True
         info(
             f"Done checking that delta table exists at {dest_bucket}",
-            data={"task": "check_delta_table", "state": STATE_FINISHED},
+            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_FINISHED},
         )
         logger.flush()
     except AnalysisException:
         delta_existed = False
         info(
             f"Delta table does not exist at {dest_bucket}",
-            data={"task": "check_delta_table", "state": STATE_FINISHED},
+            data={"task": "TASK_CHECK_DELTA_TABLE", "state": STATE_FINISHED},
         )
         logger.flush()
     return delta_existed
@@ -607,7 +572,7 @@ def delta_merge_file_status_update(
         deltaTable = DeltaTable.forPath(spark, dest_bucket)
         info(
             f"Upserting into delta table at {dest_bucket}",
-            data={"task": "update_delta_table", "state": STATE_STARTED},
+            data={"task": "TASK_UPDATE_DELTA_TABLE", "state": STATE_STARTED},
         )
         if update_columns:
             (
@@ -622,7 +587,7 @@ def delta_merge_file_status_update(
         info(
             f"Done upserting into delta table at {dest_bucket}",
             data={
-                "task": "update_delta_table",
+                "task": "TASK_UPDATE_DELTA_TABLE",
                 "state": STATE_FINISHED,
                 "metrics": get_delta_metrics(deltaTable),
             },
@@ -631,11 +596,10 @@ def delta_merge_file_status_update(
         deltaTable.optimize().executeCompaction()
         logger.flush()
     elif delta_existed is None:
-        logger.flush()
         raise Exception("Unable to update delta table")
     else:
         log_and_write_delta_table(
-            input_df, dest_bucket, {"task": "create_delta_table"}
+            input_df, dest_bucket, {"task": "TASK_CREATE_DELTA_TABLE"}
         )
         logger.flush()
 
@@ -764,12 +728,79 @@ def load_delta_table(location: str, schema: StructType) -> DeltaTable:
 
 # COMMAND ----------
 
-import atexit
+@logging_wrapper("TASK_LOAD_ALPACA", "Could not load alpaca")
+def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
+    return (
+        get_unity_data(alpaca_source)
+        .where(F.col("purposeId").isin(purposes))
+        .select(F.col("deviceId").alias("device_uuid"))
+    )
 
-def flush_logger_on_exit():
+# COMMAND ----------
+
+def add_cascade_id(cascade_id_dict: dict) -> DataFrame:
+    added_cascade_id_df = cascade_id_dict["source_df"].join(
+        cascade_id_dict["profile_df"],
+        cascade_id_dict["source_df"][cascade_id_dict["source_key"]]
+        == cascade_id_dict["profile_df"][cascade_id_dict["profile_key"]],
+        "left",
+    )
+    return added_cascade_id_df.drop(cascade_id_dict["profile_key"])
+
+# COMMAND ----------
+
+def get_latest_delta_version_by_date(date_list: list, table_name: str) -> dict:
+    delta_table = DeltaTable.forName(spark, table_name)
+    delta_history = (
+        delta_table.history()
+        .filter(F.to_date(F.col("timestamp")).isin(date_list))
+        .groupBy(F.to_date(F.col("timestamp")))
+        .max("version")
+        .select(
+            F.col("to_date(timestamp)").alias("time"),
+            F.col("max(version)").alias("version"),
+        )
+        .orderBy(F.col("time"))
+        .collect()
+    )
+    return {
+        history["time"].strftime("%Y-%m-%d"): history["version"]
+        for history in delta_history
+    }
+
+# COMMAND ----------
+
+def log_and_load_specific_version_delta_date(
+    source_info: dict, log_data: dict
+) -> DataFrame:
     try:
-        if len(logger.batch_events) > 0:
-            logger.flush()
-    except Exception:
-        pass
-atexit.register(flush_logger_on_exit)
+        info(
+            f"Starting {log_data['task']}",
+            data={"task": log_data["task"], "state": STATE_STARTED},
+        )
+        df = (
+            spark.read.format(source_info.get("format", "delta"))
+            .option("versionAsOf", source_info["version"])
+            .table(source_info["table"])
+        )
+        info(
+            f"Finished {log_data['task']}",
+            data={
+                "task": log_data["task"],
+                "state": STATE_FINISHED,
+                "rows": df.count(),
+            },
+        )
+        logger.flush()
+        return df
+    except Exception as e:
+        error(
+            log_data["error_msg"],
+            data={
+                "task": log_data["task"],
+                "dump": str(e),
+                "state": STATE_ERROR,
+            },
+        )
+        logger.flush()
+        raise e
