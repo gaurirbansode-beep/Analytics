@@ -1,15 +1,7 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
-Reference File: kb_util_commons_refrence.py
-Lines in Reference File: 0 (file not found)
-Lines in Output File: 480
-Matching Structures: 0
-Different Structures: 0
-Migration Completed: 0%
-Migration Remaining: 100%
+Reference File: kb_util_commons_reference.py
+
 Validation Status: INCOMPLETE
 
-Validation status: FAIL
-Detected logging pattern: Databricks logger migration attempted, but reference file missing.
-Migration verification result: Unable to verify migration due to missing reference file.
-Issues found: Reference file 'kb_util_commons_refrence.py' not found in repository. Migration validation cannot be performed.
+Reason: Reference file 'Input/kb_util_commons_reference.py' could not be found in the repository. Migration validation cannot be performed without the reference file. Please ensure the reference file exists at the specified path and rerun the validation.
