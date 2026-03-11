@@ -1,59 +1,47 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
-Knowledge Base (util_commons_refrence): Input/knowledge_Base.py
+Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
+Knowledge Base(util_commons_refrence): knowledge_Base.py
 
-Lines in Reference File: 395
-Lines in Output File: 276
+Lines in Reference File: 350+
+Lines in Output File: 180+
 
 Matching Structures:
-- Function definitions: get_delta_data(), log_and_load_data(), write_parquet_data(), get_date_list(), get_delta_metrics(), log_job_start(), log_job_skip(), log_job_done(), load_delta_table, add_cascade_id, logging_wrapper, get_csv_data, get_decrypted_data_from_gpg, get_redshift_data, log_and_write_parquet_data, log_and_write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_and_write_delta_data_with_partition, write_delta_with_date_partitions, log_and_load_specific_version_delta_date, flush_logger_on_exit, pseudonymize, encrypt, decrypt, get_pseudonym_secret, SourceEmptyException, get_parquet_data, get_unity_data, get_raw_date
-- Class definitions: SourceEmptyException
-- Logger initialization: DatabricksLogger (correctly migrated)
-- Logging wrapper functions: debug(), info(), warn(), error(), fatal(), logger.flush()
-- Import statements: All required imports present
+- Class Definitions: STSSession, AWSResource, SourceEmptyException
+- Function Definitions: get_secret, get_pseudonym_secret, encrypt, decrypt, pseudonymize, logging_wrapper
+- Logger Initialization: DatabricksLogger (correctly migrated), logger.flush() present, atexit flush block present
+- Logging Wrapper Functions: debug, info, warn, error, fatal, __get_event
+- Import Statements: All major imports matched (pyspark, delta, boto3, AES, gnupg, etc.)
 
 Different Structures:
-- Reference file contains additional AWS utility classes (STSSession, AWSResource) and some extra functions (write_unity_data, log_and_write_unity_data, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions, get_unity_catalog_data, filter_alpaca_consented_with_intermediate_df, load_simpleui_data) not present in migrated output.
-- Minor differences in function signatures and parameter handling (e.g., get_delta_data in reference has extra 'check_on' param).
-- Output file uses DatabricksLogger, reference uses SplunkLogger.
+- Output.py does not include all data loading/writing functions from reference (e.g., get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_csv_data, get_redshift_data, etc.)
+- Output.py has logger initialization and wrapper functions, but lacks some advanced job logging and data writing functions present in reference.
+- Output.py has removed SplunkLogger and replaced with DatabricksLogger, but some Splunk-related comments remain.
 
 Migration Completed:
-- Matched functions: 23
-- Matched structures: 7 (logger, wrapper, imports, class, flush block, pseudonymize, error handling)
-- Total structures in reference file: 32
-
-Migration % = (23 + 7) / 32 × 100 = 93.75%
+- Logger migration: Databricks logger import, initialization, wrapper functions, flush, exit block are present and correct.
+- Splunk removal: No active SplunkLogger, no requests.post(), no direct Splunk HTTP logging calls.
+- Major structural elements (classes, logger, wrappers) are migrated.
+- Logging pattern detected: DatabricksLogger with debug/info/warn/error/fatal and flush.
 
 Migration Remaining:
-- Missing functions: write_unity_data, log_and_write_unity_data, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions, get_unity_catalog_data, filter_alpaca_consented_with_intermediate_df, load_simpleui_data
-- Modified functions: get_delta_data (missing 'check_on'), log_and_load_data (minor parameter differences), add_cascade_id (parameter naming difference)
+- Missing functions: get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_csv_data, get_redshift_data, get_unity_catalog_data, log_job_start, log_job_skip, log_job_done, write_data_with_partitions, log_and_write_data_with_partitions, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, update_column_datatype, add_null_app_deployed_uuid, filter_alpaca_consented_with_intermediate_df, add_cascade_id, load_filtered_alpaca_data, load_simpleui_data, load_delta_table, get_raw_date, etc.
+- Modified functions: Some wrapper and logger functions are simplified in Output.py compared to reference.
+- Code similarity percentage: ~60%
+- Migration %: 60% (12 matched structures / 20 total major structures)
 
 Validation Status:
-Migration % = 93.75%
-→ PARTIALLY MIGRATED – GOOD TO GO
+Migration % = 60%
+→ Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
-Code Similarity Percentage: ~92% (whitespace/comments ignored)
-Detected Logging Pattern: DatabricksLogger (correctly migrated)
-Migration Verification Result: PASS
+Validation status: FAIL
 
-SPLUNK REMOVAL VALIDATION:
-- No requests.post() found
-- No splunk.prod.internal found
-- No direct Splunk HTTP logging calls found
+Detected logging pattern: DatabricksLogger (correct)
+Migration verification result: Logger migration is correct, Splunk removed, but major functions missing.
+Issues found:
+- Missing major functions from reference file (data loading, writing, advanced logging)
+- Output file does not fully implement all required structures/functions from reference
+- Migration is not complete, rework required to add missing functions
 
-LOGGER MIGRATION VALIDATION:
-- Databricks logger import present
-- logger initialization present
-- debug(), info(), warn(), error(), fatal() present
-- logger.flush() present
-- exit flush block present
-
-Issues Found:
-- Some utility functions/classes from reference file are missing in migrated output (see above)
-- Minor differences in function signatures
-
-============================================================
 Input which is migratated file , is written and update in repository.
 Validation output written and updated in in the repository.
-============================================================
