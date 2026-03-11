@@ -1,15 +1,19 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
 Reference File: util_commons_refrence.py
-Lines in Reference File: 500
+Lines in Reference File: 510
 Lines in Output File: 480
 Matching Structures: 450
-Different Structures: 50
-Migration Completed: 90%
-Migration Remaining: 10%
+Different Structures: 60
+Migration Completed: 88%
+Migration Remaining: 12%
 Validation Status: PARTIALLY MIGRATED
 
-Validation status: PASS
-Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal), logger flush on exit, logger initialization
-Migration verification result: Databricks logger migration is structurally correct, Splunk HTTP calls removed, logging wrappers implemented, major functions present
-Issues found: None
+Validation status: PARTIALLY MIGRATED (FAIL)
+Detected logging pattern: Databricks logger wrapper functions present, SplunkLogger initialization detected, flush on exit implemented.
+Migration verification result: Most logger migration steps are present, but some Splunk references and requests.post calls remain. Some wrapper functions differ in structure.
+Issues found:
+- requests.post is still imported in Output.py (should be removed for full migration)
+- Some function wrappers differ from reference implementation
+- Minor differences in logger initialization and flush block
+
