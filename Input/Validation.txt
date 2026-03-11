@@ -1,43 +1,79 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
-Knowledge Base (util_commons_refrence): NOT FOUND (404 error)
-Lines in Reference File: N/A (file missing)
-Lines in Output File: 184
+Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
+Knowledge Base (util_commons_refrence): Input/knowledge_Base.py
+
+Lines in Reference File: 367
+Lines in Output File: 180
 
 Matching Structures:
-- Logger initialization migrated to DatabricksLogger
-- Logging wrapper functions present (debug, info, warn, error, fatal)
-- Logger flush implemented and registered with atexit
-- Splunk logger blocks commented and replaced
-- Major classes (STSSession, AWSResource) present
-- get_secret, pseudonymize, encrypt, decrypt functions present
+- Class Definitions: STSSession, AWSResource, SourceEmptyException
+- Function Definitions: get_secret, get_pseudonym_secret, encrypt, decrypt, pseudonymize, logging_wrapper
+- Logger Initialization: DatabricksLogger meta_data block present, logger.flush() present, logger batch flush on exit present
+- Logging Wrapper Functions: debug, info, warn, error, fatal, __get_event
+- Import Statements: All major imports matched (pyspark, delta, boto3, AES, gnupg, pandas, etc.)
 
 Different Structures:
-- Reference file missing, unable to perform full structural comparison
-- Unable to verify presence of all major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) against reference
+- Output.py does NOT contain SplunkLogger initialization (correctly removed)
+- Output.py uses DatabricksLogger instead of SplunkLogger (correct migration)
+- Output.py does NOT contain requests.post(), splunk.prod.internal, or direct Splunk HTTP logging calls (correct removal)
+- Output.py does NOT contain all business logic functions from reference (e.g., get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_raw_date, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions)
 
-Migration Completed: Partial (reference file missing, cannot compute percentage)
-Migration Remaining: Unable to determine (reference file missing)
+Migration Completed:
+- Logger migration: 100% (all logger structures migrated, Splunk removed, Databricks logger implemented)
+- Structural migration: 7/18 major structures matched (class, logger, wrapper, pseudonymization, imports)
+- Function migration: 6/21 major functions matched (logger wrappers, pseudonymization, logging_wrapper)
+- No Splunk remnants detected
 
-Validation Status: INCOMPLETE
+Migration Remaining:
+- Missing business logic functions: get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_raw_date, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions
 
-Detected Logging Pattern:
-- DatabricksLogger used for logger initialization
-- Logging wrapper functions (debug, info, warn, error, fatal) implemented
-- logger.flush() present and registered for exit flush
+Migration % Calculation:
+- Matched Structures: 7
+- Total Structures in Reference: 18
+- Migration % = (7 / 18) × 100 = 38.9%
 
-Migration Verification Result:
-- Splunk logger blocks commented out
-- No requests.post() or direct Splunk HTTP logging calls detected in migrated file
-- Databricks logger migration appears correct based on available output
+Code Similarity Percentage:
+- Approximate similarity (logger, wrappers, imports): ~40%
+- Major business logic functions missing
 
-Issues Found:
-- Reference file 'kb_util_commons_refrence' missing (404 error)
-- Unable to compute migration percentage or perform full function/structure comparison
-- Validation cannot be fully completed without reference file
+Missing Functions:
+- get_delta_data
+- log_and_load_data
+- write_parquet_data
+- log_and_write_parquet_data
+- log_and_write_delta_table
+- log_and_write_unity_data
+- get_raw_date
+- get_date_list
+- get_delta_metrics
+- write_delta_table
+- check_if_delta_exists
+- delta_merge_file_status_update
+- log_job_start
+- log_job_skip
+- log_job_done
+- load_delta_table
+- update_column_datatype
+- add_null_app_deployed_uuid
+- write_data_with_partitions
+- log_and_write_data_with_partitions
+
+Modified Functions:
+- Logger initialization and wrapper functions migrated to DatabricksLogger (correctly modified)
+- Business logic functions not present in Output.py
+
+Validation Status:
+Migration % = 38.9%
+→ Validation Status: INCOMPLETE
 
 Validation status: FAIL
 
-Input which is migrated file, is written and updated in repository.
-Validation output written and updated in the repository.
+Detected logging pattern: DatabricksLogger (correct)
+Migration verification result: Logger migration successful, business logic migration incomplete
+Issues found: Major business logic functions missing from migrated file
+
+============================================================
+Input which is migratated file , is written and update in repository.
+
+Validation output written and updated in in the repository.
