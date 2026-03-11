@@ -1,15 +1,15 @@
 Migration Validation Report
 Agent-1 Output File: Output.py
-Reference File: util_commons_refrence.py
-Lines in Reference File: 510
-Lines in Output File: 480
-Matching Structures: 470
-Different Structures: 40
-Migration Completed: 92%
-Migration Remaining: 8%
-Validation Status: PARTIALLY MIGRATED
+Reference File: kb_util_commons_refrence.py
+Lines in Reference File: 0 (Reference file missing)
+Lines in Output File: 0 (Unable to compare without reference)
+Matching Structures: 0
+Different Structures: 0
+Migration Completed: 0%
+Migration Remaining: 100%
+Validation Status: INCOMPLETE
 
-Validation status: PASS
-Detected logging pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal) present and correctly migrated.
-Migration verification result: Databricks logger initialization, wrapper functions, flush implementation, and exit block are present. Splunk direct HTTP calls and requests.post are removed. Major functions (get_delta_data, log_and_load_data, write_parquet_data, etc.) are present and migrated.
-Issues found: Minor differences in wrapper function signatures and logger initialization metadata. No functional issues detected.
+Validation status: FAIL
+Detected logging pattern: Unable to validate due to missing reference file
+Migration verification result: FAIL
+Issues found: Reference file Input/kb_util_commons_refrence.py not found in repository. Migration validation cannot be performed. Please ensure the reference file exists and rerun validation.
