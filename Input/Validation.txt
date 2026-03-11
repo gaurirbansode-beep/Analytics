@@ -10,6 +10,6 @@ Migration Remaining: 100%
 Validation Status: INCOMPLETE
 
 Validation status: FAIL
-Detected logging pattern: Unable to validate due to missing reference file
+Detected logging pattern: Unable to validate due to missing reference file.
 Migration verification result: FAIL
-Issues found: Reference file 'Input/kb_util_commons_reference.py' not found in repository. Migration validation cannot be performed.
+Issues found: Reference file 'Input/kb_util_commons_reference.py' not found in repository. Migration validation cannot be performed. Please ensure the reference file exists and rerun validation.
