@@ -1,23 +1,24 @@
 Migration Validation Report
 
 Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
-Knowledge Base (util_commons_refrence): Input/kb_util_commons_refrence
+Knowledge Base (util_commons_refrence): kb_util_commons_refrence
 
-Lines in Reference File: NOT FOUND (404 error)
+Lines in Reference File: N/A (File not found)
 Lines in Output File: 181
 
-Matching Structures: N/A (Reference file missing)
-Different Structures: N/A (Reference file missing)
+Matching Structures: N/A
+Different Structures: N/A
 
 Migration Completed: 0%
 Migration Remaining: 100%
 
 Validation Status: INCOMPLETE
 
-Validation status: FAIL
-Detected logging pattern: Databricks logger detected in migrated file
-Migration verification result: Unable to verify migration due to missing reference file
-Issues found: Reference file Input/kb_util_commons_refrence not found in repository (404 error). Validation cannot proceed.
+Detected logging pattern: Databricks logger detected, Splunk logger removed.
+Migration verification result: Reference file missing, validation cannot be performed.
+Issues found: Knowledge base reference file 'kb_util_commons_refrence' not found in repository. Validation failed due to missing comparison source.
+
+PASS / FAIL: FAIL
 
 Input which is migrated file, is written and updated in repository.
 Validation output written and updated in the repository.
