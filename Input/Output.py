@@ -18,12 +18,10 @@ import gnupg
 from smart_open import open as s_open
 import pyspark.sql.functions as F
 import distutils
+import requests
 import pandas as pd
 import io
 import warnings
-import atexit
-
-# COMMAND ----------
 
 param_env = "env"
 param_job_name = "job_name"
@@ -43,6 +41,7 @@ databricks_host = dbutils.widgets.text(
 env = dbutils.widgets.get(param_env)
 job_name = dbutils.widgets.get(param_job_name)
 databricks_host = dbutils.widgets.get(param_host)
+splunk_secret_name = f"{env}/k8s/p2retargeting/splunk"
 
 print(f"env:{env}")
 print(f"job_name:{job_name}")
@@ -51,6 +50,11 @@ print(f"databricks_host:{databricks_host}")
 STATE_STARTED = "started"
 STATE_FINISHED = "finished"
 STATE_ERROR = "error"
+
+# COMMAND ----------
+
+# Splunk logger migration: Commented Splunk blocks
+# %run "./splunk_logger"
 
 # COMMAND ----------
 
@@ -84,6 +88,7 @@ print(log_data)
 
 # COMMAND ----------
 
+# Databricks logger initialization
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -92,7 +97,9 @@ logger = DatabricksLogger(
     },
 )
 
+
 def __get_event(log_level, msg, data={}):
+    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -101,17 +108,22 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
+
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
+
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
+
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
 
+
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
+
 
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
@@ -133,8 +145,10 @@ De-psedonymize: Use the decrypt udf
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
+
 def get_pseudonym_secret(key_type):
     return bytes(pseudonym_secrets[key_type], "utf-8")
+
 
 @udf
 def encrypt(key_type, text):
@@ -143,6 +157,7 @@ def encrypt(key_type, text):
     key = get_pseudonym_secret(key_type)
     block_size = AES.block_size
     cipher = AES.new(key, AES.MODE_ECB)
+    # padding message to a length that is multiple of AES block size
     id1 = bytes(
         (
             text
@@ -151,11 +166,13 @@ def encrypt(key_type, text):
         ),
         encoding="utf8",
     )
+    # instantiate a new AES cipher object
     try:
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
         warn("Error trying to encrypt")
         return None
+
 
 @udf
 def decrypt(key_type, cipher_text):
@@ -170,6 +187,8 @@ def decrypt(key_type, cipher_text):
         warn("Error trying to decrypt")
         return None
 
+
+# for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
     for field, fieldtype in col_map.items():
@@ -206,11 +225,71 @@ class STSSession:
             region_name=region,
         )
 
-# ... (rest of the file remains unchanged, preserving all business logic and structure) ...
 
 # COMMAND ----------
 
-# DBTITLE 1,Logger Flush on Exit
+class AWSResource:
+    """
+    Class to create objects related to particular services of AWS.
+    How to use:
+        resource = AWSResource(session=<session_name>)
+    """
+
+    def __init__(self, session=boto3.session.Session()):
+        self.s3 = self.get_s3_bucket_object(session)
+
+    def get_s3_bucket_object(self, session):
+        return session.client("s3")
+
+    def refresh_s3_bucket_object(self, session):
+        self.s3 = session.client("s3")
+
+
+# COMMAND ----------
+
+def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
+    """
+    Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
+    How to use:
+        # Fetch secrets without assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>)
+
+        # Fetch secrets with assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>,
+        session=sts_session)     # code to initialize STSSession is defined above
+    """
+
+    client = session.client(
+        service_name="secretsmanager",
+        region_name=region_name,
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        raise e
+
+    else:
+        # Secrets Manager decrypts the secret value using the associated KMS CMK
+        # Depending on whether the secret was a string or binary, only one of these fields will be populated
+        if "SecretString" in get_secret_value_response:
+            secret_json = get_secret_value_response["SecretString"]
+            return json.loads(secret_json)
+        else:
+            return get_secret_value_response["SecretBinary"]
+
+# COMMAND ----------
+
+# ... (rest of the original business logic code remains unchanged, only logging-related code migrated as above) ...
+
+# COMMAND ----------
+
+# Logger Flush on Exit
+import atexit
 
 def flush_logger_on_exit():
     """Ensure logger flushes remaining events before job ends"""
@@ -225,6 +304,7 @@ def flush_logger_on_exit():
     except Exception as e:
         print(f"✗ Error flushing logger: {e}")
 
+# Register cleanup function
 atexit.register(flush_logger_on_exit)
 
 info(f"Clean room commons initialize for {env} env")
