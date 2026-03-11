@@ -18,7 +18,6 @@ import gnupg
 from smart_open import open as s_open
 import pyspark.sql.functions as F
 import distutils
-import requests
 import pandas as pd
 import io
 import warnings
@@ -55,7 +54,6 @@ STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
 
-
 class STSSession:
     """
     Class to init a sts session for the given role.
@@ -87,7 +85,6 @@ class STSSession:
 
 # COMMAND ----------
 
-
 class AWSResource:
     """
     Class to create objects related to particular services of AWS.
@@ -106,7 +103,6 @@ class AWSResource:
 
 
 # COMMAND ----------
-
 
 def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
     """
@@ -177,9 +173,9 @@ print(log_data)
 
 # COMMAND ----------
 
-# Databricks Logger Setup
-from databricks_logger import DatabricksLogger
-logger = DatabricksLogger(
+logger = SplunkLogger(
+    token="",
+    index="",
     meta_data={
         "source": source_name,
         "sourcetype": f"databricks:{source_type}",
@@ -197,42 +193,38 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
-
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
     logger.flush()
-
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
     logger.flush()
 
-
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
     logger.flush()
-
 
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
     logger.flush()
 
-
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
     logger.flush()
 
-
-print(__get_event("INFO", f"databricks logger initialized for {env} env"))
-info(f"databricks logger initialized for {env} env")
+print(__get_event("INFO", f"Metrics logger initialized for {env} env"))
+info(f"Metrics logger initialized for {env} env")
+logger.flush()
 
 import atexit
-def _logger_exit_flush():
+def flush_logger_on_exit():
     try:
-        logger.flush()
+        if hasattr(logger, "batch_events") and len(logger.batch_events) > 0:
+            logger.flush()
     except Exception:
         pass
-atexit.register(_logger_exit_flush)
+atexit.register(flush_logger_on_exit)
 
 # COMMAND ----------
 
@@ -247,10 +239,8 @@ De-psedonymize: Use the decrypt udf
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
-
 def get_pseudonym_secret(key_type):
     return bytes(pseudonym_secrets[key_type], "utf-8")
-
 
 @udf
 def encrypt(key_type, text):
@@ -276,7 +266,6 @@ def encrypt(key_type, text):
         logger.flush()
         return None
 
-
 @udf
 def decrypt(key_type, cipher_text):
     if cipher_text is None:
@@ -291,7 +280,6 @@ def decrypt(key_type, cipher_text):
         logger.flush()
         return None
 
-
 # for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
@@ -299,13 +287,10 @@ def pseudonymize(df, col_map):
         out_df = out_df.withColumn(field, encrypt(F.lit(fieldtype), field))
     return out_df
 
-
 # COMMAND ----------
-
 
 class SourceEmptyException(Exception):
     pass
-
 
 def logging_wrapper(task, error_msg):
     def inner(func):
@@ -360,9 +345,7 @@ def logging_wrapper(task, error_msg):
 
     return inner
 
-
 # COMMAND ----------
-
 
 def get_parquet_data(
     source: str, partition_string: str = "", retain_partition_columns: bool = "False"
@@ -373,13 +356,10 @@ def get_parquet_data(
         df = spark.read.option("mergeSchema", "true").parquet(source)
     return df
 
-
 def get_delta_data(source: str) -> DataFrame:
     return spark.read.format("delta").load(source)
-
 def get_unity_data(unity_path: str) -> DataFrame:
     return spark.read.table(unity_path)
-
 def get_csv_data(source: str, separator: str = "|") -> DataFrame:
     return (
         spark.read.format("csv")
@@ -388,7 +368,6 @@ def get_csv_data(source: str, separator: str = "|") -> DataFrame:
         .load(source)
     )
 
-
 def get_decrypted_data_from_gpg(source, secret_name):
     secret = get_secret(secret_name)
     gpg = gnupg.GPG(gpgbinary="/usr/bin/gpg")
@@ -396,7 +375,6 @@ def get_decrypted_data_from_gpg(source, secret_name):
     with s_open(source, mode="rb") as file:
         decrypted_data = gpg.decrypt_file(file, passphrase=secret["passphrase"])
     return decrypted_data
-
 
 def get_redshift_data(redshift_constants: dict, create_session: bool) -> DataFrame:
     if create_session == True:
@@ -421,7 +399,6 @@ def get_redshift_data(redshift_constants: dict, create_session: bool) -> DataFra
         .load()
     )
     return df
-
 
 def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
     try:
@@ -493,7 +470,6 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
         logger.flush()
         raise e
 
-
 # COMMAND ----------
 
 def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
@@ -517,7 +493,6 @@ def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> 
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
-
 
 def log_and_write_parquet_data(
     df: DataFrame, destination_path: str, log_data: dict
@@ -562,7 +537,6 @@ def log_and_write_parquet_data(
 
 # COMMAND ----------
 
-
 def get_raw_date(raw_date, num_parts):
     processed_date = raw_date.split("-")
     if len(processed_date) != num_parts:
@@ -570,7 +544,6 @@ def get_raw_date(raw_date, num_parts):
         logger.flush()
         dbutils.notebook.exit("Date format does not match run type")
     return processed_date
-
 
 # COMMAND ----------
 
@@ -589,7 +562,6 @@ def get_date_list(date_start: str, date_end: str) -> list:
     else:
         date_list = None
     return date_list
-
 
 # COMMAND ----------
 
@@ -610,7 +582,6 @@ def get_delta_metrics(deltaTable: DeltaTable) -> dict:
             .toJSON()
             .first()
         )
-
 
 def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> None:
     if log_data["df_count"] != 0:
@@ -633,7 +604,6 @@ def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> No
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
-
 
 def log_and_write_delta_table(
     df: DataFrame, destination_path: str, log_data: dict
@@ -678,7 +648,6 @@ def log_and_write_delta_table(
         logger.flush()
         raise e
 
-
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
@@ -702,7 +671,6 @@ def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
         )
         logger.flush()
     return delta_existed
-
 
 def delta_merge_file_status_update(
     dest_bucket: str, input_df: DataFrame, update_columns: list = None
@@ -743,8 +711,6 @@ def delta_merge_file_status_update(
         log_and_write_delta_table(
             input_df, dest_bucket, {"task": "create_delta_table"}
         )
-
-
 
 # COMMAND ----------
 
@@ -847,14 +813,12 @@ def log_job_start(job_name: str, task: str) -> None:
     )
     logger.flush()
 
-
 def log_job_skip(job_name: str, task: str) -> None:
     info(
         f"Skipping {job_name} job",
         data={"task": task, "state": STATE_SKIPPED},
     )
     logger.flush()
-
 
 def log_job_done(job_name: str, task: str) -> None:
     info(
@@ -864,7 +828,6 @@ def log_job_done(job_name: str, task: str) -> None:
     logger.flush()
 
 # COMMAND ----------
-
 
 def load_delta_table(location: str, schema: StructType) -> DeltaTable:
     try:
@@ -878,9 +841,7 @@ def load_delta_table(location: str, schema: StructType) -> DeltaTable:
         ).save(location)
         return DeltaTable.forPath(spark, location)
 
-
 # COMMAND ----------
-
 
 @logging_wrapper("load_alpaca", "Could not load alpaca")
 def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
@@ -891,7 +852,6 @@ def load_filtered_alpaca_data(alpaca_source: str, purposes: list) -> DataFrame:
     )
 
 # COMMAND ----------
-
 
 def add_cascade_id(cascade_id_dict: dict) -> DataFrame:
     added_cascade_id_df = cascade_id_dict["source_df"].join(
