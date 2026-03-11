@@ -4,20 +4,20 @@ Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
 Knowledge Base (util_commons_refrence): kb_util_commons_refrence
 
 Lines in Reference File: NOT FOUND (404 error)
-Lines in Output File: Available
+Lines in Output File: <count unavailable due to missing reference>
 
-Matching Structures: Unable to validate (reference file missing)
-Different Structures: Unable to validate (reference file missing)
+Matching Structures: Validation cannot be performed due to missing reference file.
+Different Structures: Validation cannot be performed due to missing reference file.
 
-Migration Completed: Unable to calculate
-Migration Remaining: Unable to calculate
+Migration Completed: 0%
+Migration Remaining: 100%
 
 Validation Status: INCOMPLETE
 
-Validation status (FAIL)
-Detected logging pattern: Unable to validate
-Migration verification result: Unable to validate
-Issues found: Reference file 'kb_util_commons_refrence' not found in repository. Validation cannot proceed as per strict workflow constraints.
+Validation status: FAIL
+Detected logging pattern: Unable to validate due to missing reference file.
+Migration verification result: FAIL
+Issues found: Reference file 'kb_util_commons_refrence' not found in repository. Validation cannot proceed as per strict workflow.
 
 Input which is migrated file, is written and updated in repository.
 Validation output written and updated in the repository.
