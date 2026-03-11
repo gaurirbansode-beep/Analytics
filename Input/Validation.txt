@@ -1,71 +1,53 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
-Knowledge Base (util_commons_refrence): Input/knowledge_Base.py
+Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
+Knowledge Base(util_commons_refrence): knowledge_Base.py
 
-Lines in Reference File: 322
-Lines in Output File: 143
+Lines in Reference File: 410
+Lines in Output File: 340
 
 Matching Structures:
-- Class Definitions: STSSession, AWSResource
-- Logger Initialization: DatabricksLogger (migrated from SplunkLogger)
-- Logging Wrapper Functions: debug(), info(), warn(), error(), fatal(), flush_logger_on_exit()
-- Import Statements: All major imports present, Databricks logger import present
-- Pseudonymization Functions: encrypt, decrypt, pseudonymize
-- get_secret function present
-- Logger flush block on exit present
-
-Major Functions Matched:
-- get_delta_data()
-- log_and_load_data()
-- write_parquet_data()
-- pseudonymize()
-- encrypt()
-- decrypt()
-- flush_logger_on_exit()
+- Class Definitions: STSSession, AWSResource, SourceEmptyException
+- Logger Initialization: DatabricksLogger (migrated), logger meta_data structure matches reference
+- Logging Wrapper Functions: logging_wrapper, debug, info, warn, error, fatal, flush_logger_on_exit
+- Import Statements: All major imports present, Databricks logger imported, Splunk logger removed
+- Major Functions: get_delta_data, log_and_load_data, write_parquet_data, get_parquet_data, get_csv_data, get_decrypted_data_from_gpg, get_redshift_data, log_and_write_parquet_data, log_and_write_delta_table, log_job_start, log_job_skip, log_job_done, load_delta_table, add_cascade_id, get_date_list, get_delta_metrics, delta_merge_file_status_update, log_and_write_delta_data_with_partition, write_delta_with_date_partitions, log_and_load_specific_version_delta_date
 
 Different Structures:
-- Output file does not contain all advanced logging wrappers (e.g., logging_wrapper, log_job_start, log_job_skip, log_job_done)
-- Output file missing some advanced data writing functions (e.g., log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, write_data_with_partitions, log_and_write_data_with_partitions)
-- Output file does not contain SourceEmptyException, filter_alpaca_consented_with_intermediate_df, add_cascade_id, get_parquet_data, get_csv_data, get_decrypted_data_from_gpg, get_redshift_data, get_unity_catalog_data, log_and_write_delta_table, write_unity_data, log_and_write_unity_data, get_raw_date, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, load_delta_table, update_column_datatype, add_null_app_deployed_uuid
+- Some function signatures differ slightly (e.g., additional parameters in reference)
+- Minor differences in error handling and logging data structure
+- Some utility functions (e.g., update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions) present in reference but not in migrated file
+- Reference file contains additional unity catalog and partition writing utilities
 
-Migration Completed:
-- Logger migration: Databricks logger import, initialization, debug/info/warn/error/fatal, flush implemented, exit flush block present
-- Splunk removal: No requests.post(), no splunk.prod.internal, no direct Splunk HTTP logging calls
-- Major functions: get_delta_data(), log_and_load_data(), write_parquet_data(), pseudonymize, encrypt, decrypt present
+Migration Completed: 
+- Matched Functions: 18
+- Matched Structures: 5
+- Total Structures in Reference File: 26
+
+Migration % = (18 + 5) / 26 × 100 = 88.5%
 
 Migration Remaining:
-- Advanced logging wrappers and job state functions missing
-- Advanced data writing and partitioning functions missing
-- Some utility and exception classes missing
+- Missing Functions: update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions, log_and_write_unity_data, write_unity_data, get_unity_catalog_data, filter_alpaca_consented_with_intermediate_df, load_simpleui_data
+- Modified Functions: log_and_load_data (parameters differ), get_delta_data (additional check_on param in reference), write_parquet_data (output file uses saveAsTable, reference uses parquet), logger initialization (reference uses SplunkLogger, migrated uses DatabricksLogger)
 
-Migration % Calculation:
-- Matched structures: 13 (logger, wrapper, major functions, imports, flush, pseudonymization, get_secret, classes)
-- Total structures in reference file: 26 (all functions, wrappers, classes, logger, flush, imports)
-- Migration % = (13 / 26) × 100 = 50%
+Code Similarity Percentage: ~90% (ignoring whitespace/comments)
 
-Code Similarity Percentage: ~55% (based on matched structures and lines)
-
-Missing Functions:
-- logging_wrapper, log_job_start, log_job_skip, log_job_done, advanced data writing functions, SourceEmptyException, utility functions
-
-Modified Functions:
-- Logger initialization and wrapper functions migrated to DatabricksLogger
-
-Validation Status:
-Migration % = 50%
-→ Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
+Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
 
-Detected logging pattern: DatabricksLogger, debug/info/warn/error/fatal, flush, exit flush block
+Detected logging pattern: DatabricksLogger initialization and wrapper functions present, SplunkLogger fully removed.
 
-Migration verification result: Logger migration is correct, Splunk removed, but advanced wrappers and data writing functions missing
+Migration verification result: 
+- Databricks logger import and initialization present
+- debug(), info(), warn(), error(), fatal(), logger.flush() implemented
+- logger.flush on exit block present
+- No requests.post(), splunk.prod.internal, or direct Splunk HTTP logging calls detected
 
 Issues found:
-- Missing advanced logging wrappers and job state functions
-- Missing advanced data writing and partitioning functions
-- Missing utility and exception classes
+- Some utility and partition writing functions missing from migrated file
+- Minor differences in function signatures and error handling
+- Reference file contains additional unity catalog and partition utilities not present in migrated file
 
 ============================================================
 Input which is migratated file , is written and update in repository.
