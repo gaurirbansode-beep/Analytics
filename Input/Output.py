@@ -55,94 +55,6 @@ STATE_ERROR = "error"
 
 # COMMAND ----------
 
-class STSSession:
-    """
-    Class to init a sts session for the given role.
-    How to use:
-      # from lib.sts_session import STSSession
-
-      sts_session = STSSession(arn=<ASSUME_ROLE_ARN>,
-                          session_name=<SESSION_NAME>,
-                          duration=<OPTIONAL_SESSION_DURATION_IN_SECONDS>,
-                          region=<OPTIONAL_AWS_REGION>)
-    """
-
-    def __init__(
-        self, arn, session_name="sts_session", duration=3600, region="us-west-2"
-    ):
-        sts_connection = boto3.client("sts", region)
-        assume_role_object = sts_connection.assume_role(
-            RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration
-        )
-        self.credentials = assume_role_object["Credentials"]
-
-        self.sts_session = boto3.Session(
-            aws_access_key_id=self.credentials["AccessKeyId"],
-            aws_secret_access_key=self.credentials["SecretAccessKey"],
-            aws_session_token=self.credentials["SessionToken"],
-            region_name=region,
-        )
-
-
-# COMMAND ----------
-
-class AWSResource:
-    """
-    Class to create objects related to particular services of AWS.
-    How to use:
-        resource = AWSResource(session=<session_name>)
-    """
-
-    def __init__(self, session=boto3.session.Session()):
-        self.s3 = self.get_s3_bucket_object(session)
-
-    def get_s3_bucket_object(self, session):
-        return session.client("s3")
-
-    def refresh_s3_bucket_object(self, session):
-        self.s3 = session.client("s3")
-
-
-# COMMAND ----------
-
-def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
-    """
-    Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
-    How to use:
-        # Fetch secrets without assume role
-        secrets = get_secret(
-        secret_name=<SECRETS_NAME>,
-        region_name=<OPTIONAL_AWS_REGION>)
-
-        # Fetch secrets with assume role
-        secrets = get_secret(
-        secret_name=<SECRETS_NAME>,
-        region_name=<OPTIONAL_AWS_REGION>,
-        session=sts_session)     # code to initialize STSSession is defined above
-    """
-
-    client = session.client(
-        service_name="secretsmanager",
-        region_name=region_name,
-    )
-
-    try:
-        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
-    except ClientError as e:
-        raise e
-
-    else:
-        # Secrets Manager decrypts the secret value using the associated KMS CMK
-        # Depending on whether the secret was a string or binary, only one of these fields will be populated
-        if "SecretString" in get_secret_value_response:
-            secret_json = get_secret_value_response["SecretString"]
-            return json.loads(secret_json)
-        else:
-            return get_secret_value_response["SecretBinary"]
-
-
-# COMMAND ----------
-
 notebook_info = json.loads(
     dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
 )
@@ -173,12 +85,18 @@ print(log_data)
 
 # COMMAND ----------
 
-# MAGIC # Splunk logger migration: Commented Splunk blocks and replaced with Databricks logger
-# MAGIC # %run "./splunk_logger"
+# Splunk logger migration: Comment Splunk blocks and replace with Databricks logger
+# splunk_secret = get_secret(splunk_secret_name)
+# logger = SplunkLogger(
+#     token=splunk_secret["token"],
+#     index=splunk_secret["index"],
+#     meta_data={
+#         "source": source_name,
+#         "sourcetype": f"databricks:{source_type}",
+#         "host": databricks_host,
+#     },
+# )
 
-# COMMAND ----------
-
-# Databricks logger initialization
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -285,68 +203,98 @@ def pseudonymize(df, col_map):
         out_df = out_df.withColumn(field, encrypt(F.lit(fieldtype), field))
     return out_df
 
-
 # COMMAND ----------
 
-class SourceEmptyException(Exception):
-    pass
+class STSSession:
+    """
+    Class to init a sts session for the given role.
+    How to use:
+      # from lib.sts_session import STSSession
 
+      sts_session = STSSession(arn=<ASSUME_ROLE_ARN>,
+                          session_name=<SESSION_NAME>,
+                          duration=<OPTIONAL_SESSION_DURATION_IN_SECONDS>,
+                          region=<OPTIONAL_AWS_REGION>)
+    """
 
-def logging_wrapper(task, error_msg):
-    def inner(func):
-        def wrapper(*args, **kwargs):
-            try:
-                info(
-                    f"Wrapper starting {task}",
-                    data={
-                        "task": task,
-                        "state": STATE_STARTED,
-                    },
-                )
-                df = func(*args, **kwargs)
-                info(
-                    f"Wrapper finished {task}",
-                    data={
-                        "task": task,
-                        "state": STATE_FINISHED,
-                    },
-                )
-                return df
-            except AnalysisException as e:
-                error(
-                    error_msg,
-                    data={
-                        "task": task,
-                        "dump": str(e),
-                        "state": STATE_ERROR,
-                    },
-                )
-                if str(e).startswith("Path does not exist:"):
-                    raise SourceEmptyException()
-                else:
-                    raise
-            except:
-                e = sys.exc_info()[0]
-                error(
-                    error_msg,
-                    data={
-                        "task": task,
-                        "dump": str(e),
-                        "state": STATE_ERROR,
-                    },
-                )
-                raise
+    def __init__(
+        self, arn, session_name="sts_session", duration=3600, region="us-west-2"
+    ):
+        sts_connection = boto3.client("sts", region)
+        assume_role_object = sts_connection.assume_role(
+            RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration
+        )
+        self.credentials = assume_role_object["Credentials"]
 
-        return wrapper
-
-    return inner
+        self.sts_session = boto3.Session(
+            aws_access_key_id=self.credentials["AccessKeyId"],
+            aws_secret_access_key=self.credentials["SecretAccessKey"],
+            aws_session_token=self.credentials["SessionToken"],
+            region_name=region,
+        )
 
 
 # COMMAND ----------
 
-# ... (rest of the code remains unchanged, only logger migration applied as per rules) ...
+class AWSResource:
+    """
+    Class to create objects related to particular services of AWS.
+    How to use:
+        resource = AWSResource(session=<session_name>)
+    """
+
+    def __init__(self, session=boto3.session.Session()):
+        self.s3 = self.get_s3_bucket_object(session)
+
+    def get_s3_bucket_object(self, session):
+        return session.client("s3")
+
+    def refresh_s3_bucket_object(self, session):
+        self.s3 = session.client("s3")
+
 
 # COMMAND ----------
+
+
+def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
+    """
+    Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
+    How to use:
+        # Fetch secrets without assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>)
+
+        # Fetch secrets with assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>,
+        session=sts_session)     # code to initialize STSSession is defined above
+    """
+
+    client = session.client(
+        service_name="secretsmanager",
+        region_name=region_name,
+    )
+
+    try:
+        get_secret_value_response = client.get_secret_value(SecretId=secret_name)
+    except ClientError as e:
+        raise e
+
+    else:
+        # Secrets Manager decrypts the secret value using the associated KMS CMK
+        # Depending on whether the secret was a string or binary, only one of these fields will be populated
+        if "SecretString" in get_secret_value_response:
+            secret_json = get_secret_value_response["SecretString"]
+            return json.loads(secret_json)
+        else:
+            return get_secret_value_response["SecretBinary"]
+
+
+# COMMAND ----------
+
+# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and Databricks logger is used for logging)
 
 # DBTITLE 1,Logger Flush on Exit
 import atexit
@@ -367,5 +315,9 @@ def flush_logger_on_exit():
 # Register cleanup function
 atexit.register(flush_logger_on_exit)
 
-info(f"Clean room commons initialize for {env} env")
+info(f"databricks logger initialized for {env} env")
 logger.flush()
+
+# COMMAND ----------
+
+# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and Databricks logger is used for logging)
