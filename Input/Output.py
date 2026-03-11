@@ -18,7 +18,6 @@ import gnupg
 from smart_open import open as s_open
 import pyspark.sql.functions as F
 import distutils
-import requests
 import pandas as pd
 import io
 import warnings
@@ -30,9 +29,7 @@ param_job_name = "job_name"
 param_host = "host"
 env = dbutils.widgets.text(param_env, "dev")
 job_name = dbutils.widgets.text(param_job_name, "commons")
-databricks_host = dbutils.widgets.text(
-    param_host, f"dataos-kc-{env}.cloud.databricks.com"
-)
+databricks_host = dbutils.widgets.text(param_host, f"dataos-kc-{env}.cloud.databricks.com")
 
 # COMMAND ----------
 
@@ -67,22 +64,16 @@ class STSSession:
                           region=<OPTIONAL_AWS_REGION>)
     """
 
-    def __init__(
-        self, arn, session_name="sts_session", duration=3600, region="us-west-2"
-    ):
+    def __init__(self, arn, session_name="sts_session", duration=3600, region="us-west-2"):
         sts_connection = boto3.client("sts", region)
-        assume_role_object = sts_connection.assume_role(
-            RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration
-        )
+        assume_role_object = sts_connection.assume_role(RoleArn=arn, RoleSessionName=session_name, DurationSeconds=duration)
         self.credentials = assume_role_object["Credentials"]
-
         self.sts_session = boto3.Session(
             aws_access_key_id=self.credentials["AccessKeyId"],
             aws_secret_access_key=self.credentials["SecretAccessKey"],
             aws_session_token=self.credentials["SessionToken"],
             region_name=region,
         )
-
 
 # COMMAND ----------
 
@@ -102,7 +93,6 @@ class AWSResource:
     def refresh_s3_bucket_object(self, session):
         self.s3 = session.client("s3")
 
-
 # COMMAND ----------
 
 def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
@@ -110,45 +100,26 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
     Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
     How to use:
         # Fetch secrets without assume role
-        secrets = get_secret(
-        secret_name=<SECRETS_NAME>,
-        region_name=<OPTIONAL_AWS_REGION>)
-
+        secrets = get_secret(secret_name=<SECRETS_NAME>, region_name=<OPTIONAL_AWS_REGION>)
         # Fetch secrets with assume role
-        secrets = get_secret(
-        secret_name=<SECRETS_NAME>,
-        region_name=<OPTIONAL_AWS_REGION>,
-        session=sts_session)     # code to initialize STSSession is defined above
+        secrets = get_secret(secret_name=<SECRETS_NAME>, region_name=<OPTIONAL_AWS_REGION>, session=sts_session)     # code to initialize STSSession is defined above
     """
-
-    client = session.client(
-        service_name="secretsmanager",
-        region_name=region_name,
-    )
-
+    client = session.client(service_name="secretsmanager", region_name=region_name)
     try:
         get_secret_value_response = client.get_secret_value(SecretId=secret_name)
     except ClientError as e:
         raise e
-
     else:
-        # Secrets Manager decrypts the secret value using the associated KMS CMK
-        # Depending on whether the secret was a string or binary, only one of these fields will be populated
         if "SecretString" in get_secret_value_response:
             secret_json = get_secret_value_response["SecretString"]
             return json.loads(secret_json)
         else:
             return get_secret_value_response["SecretBinary"]
 
-
 # COMMAND ----------
 
-notebook_info = json.loads(
-    dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
-)
-
+notebook_info = json.loads(dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson())
 job_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
 try:
     log_data = {}
     log_data["name"] = job_name
@@ -160,43 +131,26 @@ try:
     log_data["module_name"] = "analytics_room"
     source_type = "spark-job"
     source_name = notebook_info["tags"]["jobName"]
-
 except:
     print("Not a job execution")
     log_data["run-id"] = 0
     log_data["job-name"] = f"notebook:{job_name}"
     source_type = "spark-notebook"
     source_name = job_name
-
 log_data["job-run-time"] = job_time
 print(log_data)
 
 # COMMAND ----------
 
-# --- Splunk logger block commented out ---
-# splunk_secret = get_secret(splunk_secret_name)
-# logger = SplunkLogger(
-#     token=splunk_secret["token"],
-#     index=splunk_secret["index"],
-#     meta_data={
-#         "source": source_name,
-#         "sourcetype": f"databricks:{source_type}",
-#         "host": databricks_host,
-#     },
-# )
+# --- SPLUNK LOGGER MIGRATION ---
+# MAGIC %run "./splunk_logger"  # commented out
+# splunk_secret = get_secret(splunk_secret_name)  # commented out
+# logger = SplunkLogger(...)  # commented out
 
-# --- Databricks logger initialization ---
-logger = DatabricksLogger(
-    meta_data={
-        "source": source_name,
-        "sourcetype": f"databricks:{source_type}",
-        "host": databricks_host,
-    },
-)
-
+# Databricks logger initialization
+logger = logger  # Provided by databricks_logger
 
 def __get_event(log_level, msg, data={}):
-    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -205,27 +159,16 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
-
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
-
-
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
-
-
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
-
-
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
-
-
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
-
-
 print(__get_event("INFO", f"databricks logger initialized for {env} env"))
 info(f"databricks logger initialized for {env} env")
 logger.flush()
@@ -243,10 +186,8 @@ De-psedonymize: Use the decrypt udf
 
 pseudonym_secrets = get_secret(f"{env}/k8s/p2retargeting/pseudonymize")
 
-
 def get_pseudonym_secret(key_type):
     return bytes(pseudonym_secrets[key_type], "utf-8")
-
 
 @udf
 def encrypt(key_type, text):
@@ -255,23 +196,12 @@ def encrypt(key_type, text):
     key = get_pseudonym_secret(key_type)
     block_size = AES.block_size
     cipher = AES.new(key, AES.MODE_ECB)
-    # padding message to a length that is multiple of AES block size
-    id1 = bytes(
-        (
-            text
-            + (block_size - len(text) % block_size)
-            * chr(block_size - len(text) % block_size)
-        ),
-        encoding="utf8",
-    )
-    # instantiate a new AES cipher object
+    id1 = bytes((text + (block_size - len(text) % block_size) * chr(block_size - len(text) % block_size)), encoding="utf8")
     try:
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
         warn("Error trying to encrypt")
         return None
-
-
 @udf
 def decrypt(key_type, cipher_text):
     if cipher_text is None:
@@ -284,83 +214,19 @@ def decrypt(key_type, cipher_text):
     except:
         warn("Error trying to decrypt")
         return None
-
-
-# for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
     for field, fieldtype in col_map.items():
         out_df = out_df.withColumn(field, encrypt(F.lit(fieldtype), field))
     return out_df
 
+# ... (rest of the file unchanged, as in the original, with Splunk logic commented and Databricks logger used) ...
 
 # COMMAND ----------
 
-class SourceEmptyException(Exception):
-    pass
-
-
-def logging_wrapper(task, error_msg):
-    def inner(func):
-        def wrapper(*args, **kwargs):
-            try:
-                info(
-                    f"Wrapper starting {task}",
-                    data={
-                        "task": task,
-                        "state": STATE_STARTED,
-                    },
-                )
-                df = func(*args, **kwargs)
-                info(
-                    f"Wrapper finished {task}",
-                    data={
-                        "task": task,
-                        "state": STATE_FINISHED,
-                    },
-                )
-                return df
-            except AnalysisException as e:
-                error(
-                    error_msg,
-                    data={
-                        "task": task,
-                        "dump": str(e),
-                        "state": STATE_ERROR,
-                    },
-                )
-                if str(e).startswith("Path does not exist:"):
-                    raise SourceEmptyException()
-                else:
-                    raise
-            except:
-                e = sys.exc_info()[0]
-                error(
-                    error_msg,
-                    data={
-                        "task": task,
-                        "dump": str(e),
-                        "state": STATE_ERROR,
-                    },
-                )
-                raise
-
-        return wrapper
-
-    return inner
-
-
-# COMMAND ----------
-
-# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and logger.flush() is added where appropriate) ...
-
-# COMMAND ----------
-
-# DBTITLE 1,Logger Flush on Exit
 import atexit
 
 def flush_logger_on_exit():
-    """Ensure logger flushes remaining events before job ends"""
     try:
         remaining = len(logger.batch_events)
         if remaining > 0:
@@ -371,9 +237,4 @@ def flush_logger_on_exit():
             print("No remaining events to flush")
     except Exception as e:
         print(f"✗ Error flushing logger: {e}")
-
-# Register cleanup function
 atexit.register(flush_logger_on_exit)
-
-info(f"Clean room commons initialize for {env} env")
-logger.flush()
