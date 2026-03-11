@@ -18,7 +18,8 @@ import sys
 import gnupg
 from smart_open import open as s_open
 import pyspark.sql.functions as F
-#import pandas as pd
+#import dataos_metastore.metastore.read_table
+import pandas as pd
 import warnings
 import os
 import io
@@ -169,6 +170,18 @@ print(log_data)
 
 # COMMAND ----------
 
+# --- Splunk logger block commented out ---
+# logger = SplunkLogger(
+#     token="",
+#     index="",
+#     meta_data={
+#         "source": job_name,
+#         "sourcetype": f"databricks:{source_type}",
+#         "host": databricks_host,
+#     },
+#  )
+
+# --- Databricks logger initialization ---
 logger = SplunkLogger(
     token="",
     index="",
@@ -177,7 +190,7 @@ logger = SplunkLogger(
         "sourcetype": f"databricks:{source_type}",
         "host": databricks_host,
     },
- )
+)
 
 def __get_event(log_level, msg, data=None):
     # adding log level and msg to event
@@ -285,21 +298,23 @@ def logging_wrapper(task, error_msg):
                     f"Wrapper finished {task}",
                     data={"task": task, "state": STATE_FINISHED},
                 )
+                logger.flush()
                 return df
             except AnalysisException as e:
                 error(
                     error_msg,
                     data={"task": task, "dump": str(e), "state": STATE_ERROR},
                 )
+                logger.flush()
                 if str(e).startswith("Path does not exist:"):
                     raise SourceEmptyException()
                 else:
                     raise
-            except:
-                e = sys.exc_info()[0]
+            except Exception as e:
                 error(
                     error_msg, data={"task": task, "dump": str(e), "state": STATE_ERROR}
                 )
+                logger.flush()
                 raise
 
         return wrapper
@@ -353,7 +368,6 @@ def filter_alpaca_consented_with_intermediate_df(
 
 # COMMAND ----------
 
-
 def add_cascade_id(dict_cascade_id: dict) -> DataFrame:
     added_cascade_id_df = dict_cascade_id["source_df"].join(
         dict_cascade_id["profile_df"],
@@ -368,19 +382,15 @@ def add_cascade_id(dict_cascade_id: dict) -> DataFrame:
 def get_parquet_data(source: str) -> DataFrame:
     return spark.read.option("mergeSchema", "true").parquet(source)
 
-def get_delta_data(source: str,check_on: str="s3") -> DataFrame:
-    if check_on=="unity":
+def get_delta_data(source: str, check_on: str = "s3") -> DataFrame:
+    if check_on == "unity":
         return spark.read.table(source)
     return spark.read.format("delta").load(source)
 
 # COMMAND ----------
 
-def get_delta_data(source: str,check_on: str="s3") -> DataFrame:    pass
-
 def get_unity_catalog_data(query: str) -> DataFrame:
     return spark.sql(query)
-
-# COMMAND ----------
 
 def get_csv_data(source: str, separator: str = "|") -> DataFrame:
     return (
@@ -497,6 +507,7 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 "source_location": source_info.get("path", source_info.get("query", source_info.get("metastore_query", ""))),
             },
         )
+        logger.flush()
         if str(e).startswith("Path does not exist:"):
             raise SourceEmptyException()
         else:
@@ -513,6 +524,7 @@ def log_and_load_data(source_info: dict, log_data: dict) -> DataFrame:
                 "source_location": source_info.get("path", source_info.get("query", source_info.get("metastore_query", ""))),
             },
         )
+        logger.flush()
         raise e
 
 # COMMAND ----------
@@ -533,6 +545,7 @@ def write_parquet_data(df: DataFrame, destination_path: str, log_data: dict) -> 
                 "state": STATE_ERROR,
             },
         )
+        logger.flush()
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
@@ -574,10 +587,12 @@ def log_and_write_parquet_data(
                 "state": STATE_ERROR,
             },
         )
+        logger.flush()
         raise e
 
 def log_and_write_delta_table(
-    df: DataFrame, destination: str, log_data: dict) -> None:
+    df: DataFrame, destination: str, log_data: dict
+) -> None:
     try:
         info(
             f"Writing delta table at {destination}",
@@ -601,9 +616,10 @@ def log_and_write_delta_table(
                 "state": STATE_ERROR,
             },
         )
+        logger.flush()
         raise e
 
-def write_unity_data(df: DataFrame, destination_path: str, log_data: dict,mode:str ="overwrite") -> None:
+def write_unity_data(df: DataFrame, destination_path: str, log_data: dict, mode: str = "overwrite") -> None:
     if log_data["df_count"] != 0:
         df.write.format("delta").mode(mode).option("overwriteSchema", "true").saveAsTable(destination_path)
     else:
@@ -615,12 +631,13 @@ def write_unity_data(df: DataFrame, destination_path: str, log_data: dict,mode:s
                 "state": STATE_ERROR,
             },
         )
+        logger.flush()
         raise Exception(
             "Could not write to destination as dataframe having zero records"
         )
 
 def log_and_write_unity_data(
-    df: DataFrame, destination_path: str, log_data: dict,mode: str="overwrite"
+    df: DataFrame, destination_path: str, log_data: dict, mode: str = "overwrite"
 ) -> None:
     try:
         info(
@@ -633,7 +650,7 @@ def log_and_write_unity_data(
         )
         upload_count = df.count()
         log_data["df_count"] = upload_count
-        write_unity_data(df, destination_path, log_data,mode)
+        write_unity_data(df, destination_path, log_data, mode)
         info(
             f"Done uploading {log_data['job_name']}",
             data={
@@ -656,6 +673,7 @@ def log_and_write_unity_data(
                 "state": STATE_ERROR,
             },
         )
+        logger.flush()
         raise e
 
 # COMMAND ----------
