@@ -1,33 +1,25 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
-Knowledge Base(util_commons_refrence): util_commons_refrence.py
-Lines in Reference File: 420
-Lines in Output File: 410
+Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
+Knowledge Base (util_commons_refrence): kb_util_commons_refrence
 
-Matching Structures:
-- Function definitions: 18/20 matched
-- Class definitions: 3/3 matched
-- Logger initialization: Present and correct
-- Logging wrapper functions: Present
-- Import statements: 95% matched
+Lines in Reference File: NOT FOUND (404 error)
+Lines in Output File:  [count based on migrated file]
 
-Different Structures:
-- Minor differences in function signatures (e.g., additional parameters in log_and_load_data)
-- Some utility functions missing (e.g., add_null_app_deployed_uuid)
+Matching Structures: VALIDATION FAILED (Reference file missing)
+Different Structures: VALIDATION FAILED (Reference file missing)
 
-Migration Completed: 92%
-Migration Remaining: 8%
+Migration Completed: VALIDATION FAILED (Reference file missing)
+Migration Remaining: VALIDATION FAILED (Reference file missing)
 
-Validation Status: PARTIALLY MIGRATED – GOOD TO GO
+Validation Status: INCOMPLETE
 
-Detected Logging Pattern: Databricks logger wrapper functions (debug, info, warn, error, fatal, flush)
-Migration Verification Result: Logger migration is correct. No Splunk HTTP calls or requests.post found. All logger wrapper functions implemented. Logger flush and exit block present.
 Issues Found:
-- Minor utility functions missing
-- Slight differences in function signatures
+- Reference file 'kb_util_commons_refrence' not found in repository.
+- Unable to perform structural comparison or migration validation.
 
-Validation status: PASS
+Detected logging pattern: NOT VALIDATED
+Migration verification result: NOT VALIDATED
 
-Input which is migrated file, is written and updated in repository.
 Validation output written and updated in the repository.
+Input which is migrated file, is written and updated in repository.
