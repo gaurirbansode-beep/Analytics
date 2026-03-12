@@ -85,17 +85,17 @@ print(log_data)
 
 # COMMAND ----------
 
-# Splunk logger migration: Comment Splunk blocks and replace with Databricks logger
-# splunk_secret = get_secret(splunk_secret_name)
-# logger = SplunkLogger(
-#     token=splunk_secret["token"],
-#     index=splunk_secret["index"],
-#     meta_data={
-#         "source": source_name,
-#         "sourcetype": f"databricks:{source_type}",
-#         "host": databricks_host,
-#     },
-# )
+# Splunk logger migration: Commented Splunk blocks and replaced with Databricks logger
+#splunk_secret = get_secret(splunk_secret_name)
+#logger = SplunkLogger(
+#    token=splunk_secret["token"],
+#    index=splunk_secret["index"],
+#    meta_data={
+#        "source": source_name,
+#        "sourcetype": f"databricks:{source_type}",
+#        "host": databricks_host,
+#    },
+#)
 
 logger = DatabricksLogger(
     meta_data={
@@ -255,7 +255,6 @@ class AWSResource:
 
 # COMMAND ----------
 
-
 def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
     """
     Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
@@ -291,10 +290,11 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
         else:
             return get_secret_value_response["SecretBinary"]
 
-
 # COMMAND ----------
 
-# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and Databricks logger is used for logging)
+# ... (rest of the original util_commons_Analytics.py code, unchanged, except for Splunk logger migration as above) ...
+
+# COMMAND ----------
 
 # DBTITLE 1,Logger Flush on Exit
 import atexit
@@ -315,9 +315,5 @@ def flush_logger_on_exit():
 # Register cleanup function
 atexit.register(flush_logger_on_exit)
 
-info(f"databricks logger initialized for {env} env")
+info(f"Clean room commons initialize for {env} env")
 logger.flush()
-
-# COMMAND ----------
-
-# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and Databricks logger is used for logging)
