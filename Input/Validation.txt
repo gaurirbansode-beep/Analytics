@@ -1,73 +1,50 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
-Knowledge Base (util_commons_refrence): knowledge_Base.py
+Agent 1 (Splunk_to_databricks_css)- Output File: Input/Output.py
+Knowledge Base (util_commons_refrence): Input/knowledge_Base.py
 
-Lines in Reference File: 395
+Lines in Reference File: 370
 Lines in Output File: 170
 
 Matching Structures:
-- logger initialization (DatabricksLogger used, SplunkLogger removed)
-- logging wrapper functions (__get_event, debug, info, warn, error, fatal)
-- logger.flush() implementation and exit flush block
-- import statements (Databricks logger import present)
-- pseudonymization functions (encrypt, decrypt, pseudonymize)
-- logging_wrapper function
-- SourceEmptyException class
-
-Matching Major Functions:
-- get_delta_data()
-- log_and_load_data()
-- write_parquet_data()
-- pseudonymize()
-- logging_wrapper()
-- encrypt(), decrypt()
-- flush_logger_on_exit()
+- Class Definitions: STSSession, AWSResource, SourceEmptyException
+- Function Definitions: get_secret, get_parquet_data, get_delta_data, get_csv_data, get_decrypted_data_from_gpg, get_redshift_data, log_and_load_data, pseudonymize, encrypt, decrypt, logging_wrapper
+- Logger Initialization: logger = SplunkLogger(...) (Databricks logger import present)
+- Logging Wrapper Functions: debug, info, warn, error, fatal, __get_event
+- Logger Flush Block: logger.flush(), atexit.register(flush_logger_on_exit)
 
 Different Structures:
-- Some AWS utility classes (STSSession, AWSResource) not present in migrated file
-- Some advanced data loading/writing functions (log_and_write_delta_table, log_and_write_unity_data, log_and_write_data_with_partitions, etc.) missing in migrated file
-- get_secret() function not present in migrated file
-- Additional functions for Redshift, CSV, GPG, Unity Catalog, partitioned writes, etc. missing in migrated file
+- Output file does not contain all advanced write functions (write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, write_unity_data, log_and_write_unity_data, write_data_with_partitions, log_and_write_data_with_partitions)
+- Output file does not contain utility functions (get_date_list, get_delta_metrics, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, add_cascade_id, filter_alpaca_consented_with_intermediate_df, load_filtered_alpaca_data, load_simpleui_data)
+- Output file logger meta_data structure differs slightly (module_name: analytics_room vs cascade)
+- Output file does not implement all logging wrappers for job start/skip/done
 
 Migration Completed:
-- Logger migration: PASS (Databricks logger fully implemented, Splunk removed)
-- Logging pattern: DatabricksLogger, debug/info/warn/error/fatal, flush, exit block
-- Splunk removal: PASS (No requests.post, splunk.prod.internal, or direct Splunk HTTP logging calls found)
-- Major functions: get_delta_data(), log_and_load_data(), write_parquet_data() present
-- Structural comparison: Most logger-related structures matched
+- Matched Functions: 11
+- Matched Structures: 6
+- Total Structures in Reference File: 32
+- Migration % = (11+6)/32 × 100 = 53%
 
 Migration Remaining:
-- Missing advanced utility functions (AWS, Redshift, CSV, GPG, Unity Catalog, partitioned writes, etc.)
-- Missing get_secret() and some data loading/writing wrappers
-
-Migration % Calculation:
-- Matched structures/functions: 11
-- Total structures/functions in reference: 22
-- Migration % = (11 / 22) × 100 = 50%
-
-Code Similarity Percentage: ~45% (logger and core functions migrated, but many utility/data functions missing)
-
-Missing Functions:
-- STSSession, AWSResource, get_secret, get_parquet_data, get_csv_data, get_decrypted_data_from_gpg, get_redshift_data, log_and_write_delta_table, log_and_write_unity_data, log_and_write_data_with_partitions, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions
-
-Modified Functions:
-- logger initialization and wrapper functions migrated to DatabricksLogger
+- Missing Functions: write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, write_unity_data, log_and_write_unity_data, write_data_with_partitions, log_and_write_data_with_partitions, get_date_list, get_delta_metrics, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, add_cascade_id, filter_alpaca_consented_with_intermediate_df, load_filtered_alpaca_data, load_simpleui_data
+- Modified Functions: logger meta_data, logging_wrapper (minor differences)
+- Code Similarity Percentage: ~55% (based on structure and function overlap)
 
 Validation Status:
-Migration % = 50
+Migration % = 53%
 → Validation Status: PARTIALLY MIGRATED – REWORK REQUIRED
 
 Validation status: FAIL
 
-Detected logging pattern: DatabricksLogger (debug/info/warn/error/fatal/flush/exit block)
+Detected logging pattern: Databricks logger initialization and wrapper functions present, but not all reference logging patterns are implemented.
 
-Migration verification result: Logger migration successful, Splunk removed, but many utility/data functions missing
+Migration verification result: Partial migration. Major logger and wrapper functions are present, but many utility and advanced write functions are missing.
 
 Issues found:
-- Missing advanced utility functions and wrappers from reference file
-- get_secret() and AWS/Redshift/CSV/GPG/partitioned write functions not migrated
-- Only logger and core pseudonymization functions migrated
+- Missing advanced write and utility functions from reference file
+- Logger meta_data structure differs
+- Not all logging wrappers for job start/skip/done implemented
+- Output file does not fully match reference structure
 
 Input which is migratated file , is written and update in repository.
 
