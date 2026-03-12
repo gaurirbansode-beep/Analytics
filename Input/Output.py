@@ -1,1 +1,1 @@
-Migrated content with Databricks logging framework
+Migrated content with Databricks logger replacing Splunk logger, ensuring all migration steps are applied and business logic remains unchanged.
