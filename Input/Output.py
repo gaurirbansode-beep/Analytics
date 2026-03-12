@@ -1,1 +1,1 @@
-Migrated content with Databricks logging
+<MIGRATED_FULL_CONTENT>
