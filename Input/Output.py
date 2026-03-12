@@ -23,6 +23,8 @@ import pandas as pd
 import io
 import warnings
 
+# COMMAND ----------
+
 param_env = "env"
 param_job_name = "job_name"
 param_host = "host"
@@ -83,19 +85,6 @@ print(log_data)
 
 # COMMAND ----------
 
-# --- Splunk logger migration: Commented Splunk blocks ---
-# splunk_secret = get_secret(splunk_secret_name)
-# logger = SplunkLogger(
-#     token=splunk_secret["token"],
-#     index=splunk_secret["index"],
-#     meta_data={
-#         "source": source_name,
-#         "sourcetype": f"databricks:{source_type}",
-#         "host": databricks_host,
-#     },
-# )
-
-# --- Databricks logger initialization ---
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -106,6 +95,7 @@ logger = DatabricksLogger(
 
 
 def __get_event(log_level, msg, data={}):
+    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -133,6 +123,7 @@ def error(msg: object, data: object = {}):
 
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
+
 
 print(__get_event("INFO", f"databricks logger initialized for {env} env"))
 info(f"databricks logger initialized for {env} env")
@@ -163,6 +154,7 @@ def encrypt(key_type, text):
     key = get_pseudonym_secret(key_type)
     block_size = AES.block_size
     cipher = AES.new(key, AES.MODE_ECB)
+    # padding message to a length that is multiple of AES block size
     id1 = bytes(
         (
             text
@@ -171,6 +163,7 @@ def encrypt(key_type, text):
         ),
         encoding="utf8",
     )
+    # instantiate a new AES cipher object
     try:
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
@@ -192,6 +185,7 @@ def decrypt(key_type, cipher_text):
         return None
 
 
+# for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
     for field, fieldtype in col_map.items():
@@ -251,6 +245,21 @@ class AWSResource:
 # COMMAND ----------
 
 def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
+    """
+    Method to get secrets irrespective of session type. Please pass a STSSession if need to read secrets using assume-role.
+    How to use:
+        # Fetch secrets without assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>)
+
+        # Fetch secrets with assume role
+        secrets = get_secret(
+        secret_name=<SECRETS_NAME>,
+        region_name=<OPTIONAL_AWS_REGION>,
+        session=sts_session)     # code to initialize STSSession is defined above
+    """
+
     client = session.client(
         service_name="secretsmanager",
         region_name=region_name,
@@ -262,15 +271,18 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
         raise e
 
     else:
+        # Secrets Manager decrypts the secret value using the associated KMS CMK
+        # Depending on whether the secret was a string or binary, only one of these fields will be populated
         if "SecretString" in get_secret_value_response:
             secret_json = get_secret_value_response["SecretString"]
             return json.loads(secret_json)
         else:
             return get_secret_value_response["SecretBinary"]
 
+
 # COMMAND ----------
 
-# ... (rest of the original business logic code remains unchanged, only logging blocks migrated) ...
+# ... (rest of the original util_commons_Analytics.py code, unchanged, except for Splunk logger blocks migrated as above) ...
 
 # COMMAND ----------
 
