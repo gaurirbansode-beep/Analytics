@@ -72,7 +72,6 @@ try:
     log_data["module_name"] = "analytics_room"
     source_type = "spark-job"
     source_name = notebook_info["tags"]["jobName"]
-
 except:
     print("Not a job execution")
     log_data["run-id"] = 0
@@ -84,6 +83,18 @@ log_data["job-run-time"] = job_time
 print(log_data)
 
 # COMMAND ----------
+
+# Splunk logger migration: Comment Splunk blocks and replace logger initialization
+#splunk_secret = get_secret(splunk_secret_name)
+#logger = SplunkLogger(
+#    token=splunk_secret["token"],
+#    index=splunk_secret["index"],
+#    meta_data={
+#        "source": source_name,
+#        "sourcetype": f"databricks:{source_type}",
+#        "host": databricks_host,
+#    },
+#)
 
 logger = DatabricksLogger(
     meta_data={
@@ -279,10 +290,93 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
         else:
             return get_secret_value_response["SecretBinary"]
 
+# COMMAND ----------
+
+notebook_info = json.loads(
+    dbutils.notebook.entry_point.getDbutils().notebook().getContext().toJson()
+)
+
+job_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+try:
+    log_data = {}
+    log_data["name"] = job_name
+    log_data["job-id"] = notebook_info["tags"]["jobId"]
+    log_data["job-name"] = notebook_info["tags"]["jobName"]
+    log_data["run-id"] = notebook_info["tags"]["runId"]
+    log_data["run-num"] = notebook_info["tags"]["idInJob"]
+    log_data["job-trigger-type"] = notebook_info["tags"]["jobTriggerType"]
+    log_data["module_name"] = "analytics_room"
+    source_type = "spark-job"
+    source_name = notebook_info["tags"]["jobName"]
+except:
+    print("Not a job execution")
+    log_data["run-id"] = 0
+    log_data["job-name"] = f"notebook:{job_name}"
+    source_type = "spark-notebook"
+    source_name = job_name
+
+log_data["job-run-time"] = job_time
+print(log_data)
 
 # COMMAND ----------
 
-# ... (rest of the original util_commons_Analytics.py code, unchanged, except for Splunk logger blocks migrated as above) ...
+class SourceEmptyException(Exception):
+    pass
+
+
+def logging_wrapper(task, error_msg):
+    def inner(func):
+        def wrapper(*args, **kwargs):
+            try:
+                info(
+                    f"Wrapper starting {task}",
+                    data={
+                        "task": task,
+                        "state": STATE_STARTED,
+                    },
+                )
+                df = func(*args, **kwargs)
+                info(
+                    f"Wrapper finished {task}",
+                    data={
+                        "task": task,
+                        "state": STATE_FINISHED,
+                    },
+                )
+                return df
+            except AnalysisException as e:
+                error(
+                    error_msg,
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
+                )
+                if str(e).startswith("Path does not exist:"):
+                    raise SourceEmptyException()
+                else:
+                    raise
+            except:
+                e = sys.exc_info()[0]
+                error(
+                    error_msg,
+                    data={
+                        "task": task,
+                        "dump": str(e),
+                        "state": STATE_ERROR,
+                    },
+                )
+                raise
+
+        return wrapper
+
+    return inner
+
+# COMMAND ----------
+
+# ... (rest of the original business logic code remains unchanged)
 
 # COMMAND ----------
 
