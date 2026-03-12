@@ -1,77 +1,19 @@
 Migration Validation Report
 
-Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
-Knowledge Base (util_commons_refrence): knowledge_Base.py
+Agent-1 Output File: Input/Output.py, Input/knowledge_Base.py
+Knowledge Base Reference File: Input/kb_util_commons_refrence.py
 
-Lines in Reference File: 377
-Lines in Output File: 180
+Status: Validation could not be completed due to the missing or inaccessible reference file 'kb_util_commons_refrence.py'.
 
-Matching Structures:
-- Class Definitions: STSSession, AWSResource, SourceEmptyException
-- Logger Initialization: logger = SplunkLogger(...) (structure matches reference)
-- Logging Wrapper Functions: debug, info, warn, error, fatal, logging_wrapper (all present)
-- Import Statements: All major imports present and matching (minor differences in order/unused imports)
-- Logger Flush on Exit: flush_logger_on_exit (matches reference)
-- Pseudonymization Functions: encrypt, decrypt, pseudonymize (all present)
-- get_secret function present and structurally matching
+Steps Taken:
+1. Attempted to read the migrated files successfully.
+2. Attempted to read the reference file but encountered a 404 error.
+3. Consulted with the Senior Software Engineer to resolve the issue.
+4. Determined that the GitHub token permissions or file existence need to be verified.
 
-Different Structures:
-- Output.py missing several major functions from reference:
-  * get_delta_data (only stub, not full implementation)
-  * log_and_load_data (missing)
-  * write_parquet_data (missing)
-  * log_and_write_parquet_data (missing)
-  * log_and_write_delta_table (missing)
-  * log_and_write_unity_data (missing)
-  * get_csv_data, get_redshift_data, get_unity_catalog_data, get_parquet_data (missing)
-  * add_cascade_id, filter_alpaca_consented_with_intermediate_df, add_null_app_deployed_uuid (missing)
-  * log_job_start, log_job_skip, log_job_done (missing)
-  * write_data_with_partitions, log_and_write_data_with_partitions (missing)
-  * get_date_list, get_raw_date, update_column_datatype, get_delta_metrics, delta_merge_file_status_update, check_if_delta_exists (missing)
-- Output.py logger wrapper functions use data={} default, reference uses data=None (minor difference)
-- Output.py has some unused imports (requests, pandas, io, warnings) not used in logger migration
-- Output.py does not implement all exit flush blocks for every function (only global flush)
+Next Steps:
+- Verify the existence of the reference file in the repository.
+- Ensure the GitHub token has the necessary permissions.
+- Provide the correct reference file or guidance on how to proceed without it.
 
-Migration Completed: 
-- Matching Structures: 9 (logger, wrapper, pseudonymization, classes, imports, flush, get_secret, logging_wrapper, SourceEmptyException)
-- Total Structures in Reference File: 22 (all major functions, classes, logger, wrappers, flush, pseudonymization, imports)
-- Migration % = (9 / 22) × 100 = 40.9%
-
-Migration Remaining:
-- 13 major functions and structures missing or incomplete
-
-Validation Status:
-Migration % < 50 → INCOMPLETE
-
-Code Similarity Percentage: ~45% (based on matching structures and lines)
-Missing Functions: get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_csv_data, get_redshift_data, get_unity_catalog_data, get_parquet_data, add_cascade_id, filter_alpaca_consented_with_intermediate_df, add_null_app_deployed_uuid, log_job_start, log_job_skip, log_job_done, write_data_with_partitions, log_and_write_data_with_partitions, get_date_list, get_raw_date, update_column_datatype, get_delta_metrics, delta_merge_file_status_update, check_if_delta_exists
-
-Modified Functions: logger wrapper functions (minor default argument difference), logger initialization (source_name vs job_name)
-
-Splunk Removal Validation:
-- No requests.post() found in Output.py
-- No splunk.prod.internal found
-- No direct Splunk HTTP logging calls found
-
-Logger Migration Validation:
-- Databricks logger import present
-- logger initialization present
-- debug(), info(), warn(), error(), fatal() present
-- logger.flush() present
-- exit flush block present
-
-Detected Logging Pattern: Databricks logger wrapper with flush on exit, matches reference structure
-
-Migration Verification Result: Logger migration is correct, but major functional migration is incomplete.
-
-Issues Found:
-- Missing major functions required for full migration
-- Only partial structural migration completed
-- Output file does not implement all reference functions
-
-Validation status (PASS / FAIL): FAIL
-
-============================================================
-Input which is migratated file , is written and update in repository.
-Validation output written and updated in in the repository.
-============================================================
+Validation cannot proceed until the reference file issue is resolved.
