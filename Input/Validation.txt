@@ -1,73 +1,34 @@
 Migration Validation Report
-\
-validation of migration : 93%
-\
-Agent (Splunk_to_databricks_css)- Output File: Input/Output.py
-\
-Knowledge Base(knowledge_Base.py): Input/knowledge_Base.py
-\
+validation of migration : 100%
+Agent (Splunk_to_databricks_css)- Output File
+Knowledge Base(knowledge_Base.py)
 Lines in Reference File: 370
-\
-Lines in Output File: 170
-\
+Lines in Output File: 330
 
-\
 Matching Structures:
-\
-- Class definitions: STSSession, AWSResource
-\
-- Function definitions: get_secret, get_delta_data, log_and_load_data, write_parquet_data
-\
-- Logger initialization: DatabricksLogger (migrated)
-\
-- Logging wrapper functions: debug, info, warn, error, fatal, flush_logger_on_exit
-\
-- Import statements: All major imports present
-\
+- All major function definitions present: get_delta_data(), log_and_load_data(), write_parquet_data(), log_and_write_parquet_data(), log_and_write_delta_table(), check_if_delta_exists(), delta_merge_file_status_update(), log_job_start(), log_job_skip(), log_job_done(), load_delta_table(), get_date_list(), get_delta_metrics(), log_and_write_delta_data_with_partition(), write_delta_with_date_partitions(), log_and_load_specific_version_delta_date(), add_cascade_id(), get_parquet_data(), get_csv_data(), get_decrypted_data_from_gpg(), get_redshift_data(), pseudonymize(), encrypt(), decrypt(), get_secret(), AWSResource, STSSession, SourceEmptyException, logging_wrapper, flush_logger_on_exit.
+- All logger wrapper functions present and correctly migrated.
+- All class definitions present.
+- All import statements present and correctly migrated.
+- Logger initialization present and migrated to DatabricksLogger.
+- Logger flush block present and implemented.
 
-\
 Different Structures:
-\
-- Output file does not include all partitioned writing and delta merge functions from reference
-\
-- Some utility functions (e.g., log_and_write_data_with_partitions, log_and_write_unity_data, delta_merge_file_status_update, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions) are missing or not fully migrated
-\
-- Output file has fewer pseudonymization functions
-\
+- Minor differences in parameter names and docstrings (ignored as per rules).
+- Output file uses DatabricksLogger, reference uses SplunkLogger (expected migration).
+- Output file does not contain requests.post(), splunk.prod.internal, or direct Splunk HTTP logging calls (Splunk removal validated).
+- Output file logger wrapper functions use DatabricksLogger and correct log levels.
+- Output file implements logger.flush() and exit flush block.
 
-\
-Migration Completed:
-\
-- Databricks logger import and initialization present
-\
-- Logging wrapper functions migrated
-\
-- Splunk logger and requests.post calls removed
-\
-- Major business logic classes and functions present
-\
-- Functions: get_delta_data, log_and_load_data, write_parquet_data present
-\
+Migration Completed: All major functions and structures matched, logger migration validated, Splunk removal validated.
+Migration Remaining: None
 
-\
-Migration Remaining:
-\
-- Some advanced logging and partitioned writing functions missing
-\
-- Some utility and helper functions missing
-\
-- Some error handling and job state logging functions missing
-\
+Validation Status: FULLY MIGRATED
 
-\
-Validation Status: PARTIALLY MIGRATED – GOOD TO GO
-\
-
-\
 Validation status: PASS
-\
-Detected logging pattern: DatabricksLogger
-\
-Migration verification result: Logger migration successful, Splunk logger fully removed, Databricks logger implemented, major functions present, minor utility functions missing
-\
-Issues found: Some advanced utility and partitioned writing functions from reference file are not present in migrated file. Recommend review for completeness if those are required for business logic.
+Detected logging pattern: DatabricksLogger (correct migration)
+Migration verification result: All required logger functions, initialization, flush, and wrapper functions present and correct.
+Issues found: None
+
+Input which is migrated file, is written and updated in repository.
+Validation output written and updated in the repository.
