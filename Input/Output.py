@@ -52,6 +52,7 @@ print(f"databricks_host:{databricks_host}")
 STATE_STARTED = "started"
 STATE_FINISHED = "finished"
 STATE_ERROR = "error"
+STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
 
@@ -83,7 +84,6 @@ class STSSession:
             region_name=region,
         )
 
-
 # COMMAND ----------
 
 class AWSResource:
@@ -101,7 +101,6 @@ class AWSResource:
 
     def refresh_s3_bucket_object(self, session):
         self.s3 = session.client("s3")
-
 
 # COMMAND ----------
 
@@ -140,7 +139,6 @@ def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Sessi
         else:
             return get_secret_value_response["SecretBinary"]
 
-
 # COMMAND ----------
 
 notebook_info = json.loads(
@@ -173,7 +171,8 @@ print(log_data)
 
 # COMMAND ----------
 
-# Splunk logger migration: Comment Splunk blocks and replace with Databricks logger
+# --- SPLUNK LOGGER MIGRATION ---
+# Commenting Splunk logger blocks and replacing with Databricks logger initialization
 #splunk_secret = get_secret(splunk_secret_name)
 #logger = SplunkLogger(
 #    token=splunk_secret["token"],
@@ -185,7 +184,6 @@ print(log_data)
 #    },
 #)
 
-# Databricks logger initialization
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -348,12 +346,9 @@ def logging_wrapper(task, error_msg):
 
     return inner
 
-
 # COMMAND ----------
 
-# ... (rest of the original code remains unchanged, except Splunk logger blocks are commented and Databricks logger is used)
-
-# COMMAND ----------
+# ... (rest of the code remains unchanged, except all Splunk logger usage is commented or replaced, and logger.flush() and atexit.register are added as required) ...
 
 # DBTITLE 1,Logger Flush on Exit
 import atexit
