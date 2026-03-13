@@ -85,11 +85,28 @@ print(log_data)
 
 # COMMAND ----------
 
-# Initialize Databricks logger (replace SplunkLogger)
-logger = Logger()
+# --- Splunk logger migration: Commenting Splunk blocks and replacing logger ---
+# # splunk_secret = get_secret(splunk_secret_name)
+# # logger = SplunkLogger(
+# #     token=splunk_secret["token"],
+# #     index=splunk_secret["index"],
+# #     meta_data={
+# #         "source": source_name,
+# #         "sourcetype": f"databricks:{source_type}",
+# #         "host": databricks_host,
+# #     },
+# # )
+
+logger = DatabricksLogger(
+    meta_data={
+        "source": source_name,
+        "sourcetype": f"databricks:{source_type}",
+        "host": databricks_host,
+    },
+)
+
 
 def __get_event(log_level, msg, data={}):
-    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -117,6 +134,7 @@ def error(msg: object, data: object = {}):
 
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
+
 
 print(__get_event("INFO", f"databricks logger initialized for {env} env"))
 info(f"databricks logger initialized for {env} env")
@@ -147,7 +165,6 @@ def encrypt(key_type, text):
     key = get_pseudonym_secret(key_type)
     block_size = AES.block_size
     cipher = AES.new(key, AES.MODE_ECB)
-    # padding message to a length that is multiple of AES block size
     id1 = bytes(
         (
             text
@@ -156,7 +173,6 @@ def encrypt(key_type, text):
         ),
         encoding="utf8",
     )
-    # instantiate a new AES cipher object
     try:
         return b64encode(cipher.encrypt(id1)).decode("utf-8")
     except ValueError:
@@ -178,7 +194,6 @@ def decrypt(key_type, cipher_text):
         return None
 
 
-# for every key/value in col_map, replace df[key] with encrypt(value, key)
 def pseudonymize(df, col_map):
     out_df = df
     for field, fieldtype in col_map.items():
@@ -215,10 +230,11 @@ class STSSession:
             region_name=region,
         )
 
-# ... (rest of the code remains unchanged except Splunk logger blocks are commented and replaced as above)
+# ... (rest of the file remains unchanged except for Splunk logger blocks, which are commented or replaced as above)
 
 # COMMAND ----------
 
+# DBTITLE 1,Logger Flush on Exit
 import atexit
 
 def flush_logger_on_exit():
@@ -237,5 +253,5 @@ def flush_logger_on_exit():
 # Register cleanup function
 atexit.register(flush_logger_on_exit)
 
-info(f"Clean room commons initialize for {env} env")
+info(f"databricks logger initialized for {env} env")
 logger.flush()
