@@ -3,61 +3,59 @@ Migration Validation Report
 Agent 1 (Splunk_to_databricks_css)- Output File: Output.py
 Knowledge Base (util_commons_refrence): knowledge_Base.py
 
-Lines in Reference File: 323
-Lines in Output File: 156
+Lines in Reference File: 420
+Lines in Output File: 180
 
 Matching Structures:
-- Class Definitions: STSSession, AWSResource, SourceEmptyException
-- Logger Initialization: DatabricksLogger (migrated), logger meta_data structure matches reference
-- Logging Wrapper Functions: logging_wrapper, __get_event, debug, info, warn, error, fatal
-- Import Statements: All major imports present (boto3, pyspark, delta, AES, gnupg, etc.)
-- Logger Flush on Exit: atexit.register(flush_logger_on_exit) present
-
-Matching Functions:
-- get_secret
-- get_pseudonym_secret
-- encrypt (UDF)
-- decrypt (UDF)
-- pseudonymize
-- logging_wrapper
-- flush_logger_on_exit
-
-Major Functions from Reference File Present:
-- get_delta_data (exists, but implementation is minimal)
-- log_and_load_data (not present in migrated file)
-- write_parquet_data (not present in migrated file)
+- Import statements: Matched (minor differences in order/unused imports)
+- Logger initialization: Matched (Databricks logger used, SplunkLogger replaced)
+- Logging wrapper functions: Matched (debug, info, warn, error, fatal, flush, wrapper)
+- Class definitions: SourceEmptyException present, other AWS classes missing
+- Major functions: pseudonymize, encrypt, decrypt, logging_wrapper present
 
 Different Structures:
-- Output file does not contain all data loading/writing functions (log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, etc.)
-- Output file has DatabricksLogger instead of SplunkLogger (expected)
-- Output file does not contain all partitioned writing and delta merge functions
+- AWSResource, STSSession, get_secret, get_parquet_data, get_csv_data, get_redshift_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, write_unity_data, log_and_write_unity_data, get_raw_date, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions: Missing or not fully implemented in Output.py
 
 Migration Completed:
-- Logger migration: PASS (Databricks logger import, initialization, debug/info/warn/error/fatal, logger.flush, exit flush block all present)
+- Logger migration: PASS (Databricks logger import, initialization, debug/info/warn/error/fatal, flush, exit flush block implemented)
 - Splunk removal: PASS (No requests.post, no splunk.prod.internal, no direct Splunk HTTP logging calls)
-- Structural comparison: Partial (all logger-related structures migrated, but many data loading/writing functions missing)
-- Function validation: Partial (some major functions missing)
+- Function migration: PARTIAL (Only pseudonymize, encrypt, decrypt, logging_wrapper, SourceEmptyException present; major business/data functions missing)
 
 Migration Remaining:
-- Missing functions: log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, get_csv_data, get_redshift_data, get_unity_catalog_data, filter_alpaca_consented_with_intermediate_df, add_cascade_id, get_parquet_data, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions
+- Missing major functions: get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, write_unity_data, log_and_write_unity_data, get_raw_date, get_date_list, get_delta_metrics, write_delta_table, check_if_delta_exists, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions
 
 Migration % Calculation:
-- Matched structures/functions: 13
-- Total structures/functions in reference: 38
-- Migration % = (13 / 38) × 100 = 34.2%
+- Matched structures: 7 (import, logger init, wrapper, pseudonymize, encrypt, decrypt, SourceEmptyException)
+- Total structures in reference file: 24 (all major classes/functions/wrappers/loggers)
+- Migration % = (7 / 24) × 100 = 29.2%
 
-Code Similarity Percentage: ~40% (logger and wrapper code matches, but data functions missing)
-Missing Functions: See above
-Modified Functions: Logger initialization and wrapper functions migrated to DatabricksLogger
+Code similarity percentage: ~35% (logger and wrapper logic, pseudonymization, but missing business/data functions)
+
+Missing functions: All major data loading, writing, AWS, and utility functions as listed above
+
+Modified functions: Logging functions adapted for Databricks logger, but business/data functions not migrated
 
 Validation Status:
 Migration % < 50 → INCOMPLETE
 
 Validation status: FAIL
 
-Detected logging pattern: DatabricksLogger (correct)
-Migration verification result: Logger migration successful, Splunk removed, but major data functions missing
-Issues found: Missing major functions (log_and_load_data, write_parquet_data, etc.), incomplete migration
+Detected logging pattern: Databricks logger (correct), Splunk removed
 
-Input which is migrated file, is written and updated in repository.
-Validation output written and updated in the repository.
+Migration verification result: Logger migration correct, business/data function migration incomplete
+
+Issues found:
+- Major business/data functions from reference file missing in migrated output
+- Only logger and pseudonymization logic migrated
+- AWS and data utility classes/functions not migrated
+
+====================================================================
+Validation status: FAIL
+Detected logging pattern: Databricks logger (correct)
+Migration verification result: Logger migration correct, business/data function migration incomplete
+Issues found: Major business/data functions missing, migration incomplete
+====================================================================
+
+Input which is migratated file , is written and update in repository.
+
+Validation output written and updated in in the repository.
