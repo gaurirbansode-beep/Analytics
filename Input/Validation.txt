@@ -1,57 +1,91 @@
 Migration Validation Report
 
 Agent (Splunk_to_databricks_css)- Output File: Output.py
-Reference file (util_commons_refrence.py): util_commons_refrence.py
+Second Input File (Reference file): util_commons_refrence.py
 
-Lines in Reference File: 495
-Lines in Output File: 210
+Lines in Reference File: 600+ (approximate, see actual file)
+Lines in Output File: 200+ (approximate, see actual file)
 
 Matching Structures:
-- Import statements: 17/19 (minor differences: TimestampType, os, date)
-- Class definitions: 3/3 (STSSession, AWSResource, SourceEmptyException)
-- Logger initialization: Databricks logger initialized via %run in both; Splunk logger removed in Output.py
-- Logging wrapper functions: Present in both (logging_wrapper)
-- Logging methods: debug, info, warn, error, fatal, flush implemented in both
-- Pseudonymization functions: get_pseudonym_secret, encrypt, decrypt, pseudonymize present in both
+- Class: STSSession
+- Function: __get_event
+- Function: debug
+- Function: info
+- Function: warn
+- Function: error
+- Function: fatal
+- Function: get_pseudonym_secret
+- Function: encrypt (UDF)
+- Function: decrypt (UDF)
+- Function: pseudonymize
+- Logger initialization (Databricks logger in Output.py, SplunkLogger in reference)
+- Logger flush on exit (atexit handler)
+- Import statements (core Spark, boto3, AES, etc.)
 
-Different Structures:
-- Output.py does not contain all data loading/writing functions from reference (e.g., get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, etc.)
-- Output.py missing several utility and data pipeline functions (e.g., filter_alpaca_consented_with_intermediate_df, add_cascade_id, get_csv_data, get_redshift_data, get_date_list, get_delta_metrics, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions)
-- Output.py does not implement all logging states (e.g., STATE_SKIPPED)
-- Output.py does not contain all logging calls in data pipeline functions
+Different Structures / Missing Functions:
+- Output.py is missing many data utility functions present in the reference, including:
+  - get_secret
+  - logging_wrapper
+  - load_filtered_alpaca_data
+  - load_simpleui_data
+  - filter_alpaca_consented_with_intermediate_df
+  - add_cascade_id
+  - get_parquet_data
+  - get_delta_data
+  - get_unity_catalog_data
+  - get_csv_data
+  - get_decrypted_data_from_gpg
+  - get_redshift_data
+  - log_and_load_data
+  - write_parquet_data
+  - log_and_write_parquet_data
+  - log_and_write_delta_table
+  - write_unity_data
+  - log_and_write_unity_data
+  - get_raw_date
+  - get_date_list
+  - get_delta_metrics
+  - write_delta_table
+  - check_if_delta_exists
+  - delta_merge_file_status_update
+  - log_job_start
+  - log_job_skip
+  - log_job_done
+  - load_delta_table
+  - update_column_datatype
+  - add_null_app_deployed_uuid
+  - write_data_with_partitions
+  - log_and_write_data_with_partitions
 
 Migration Completed:
-- Logger migration: PASS (Splunk logger removed, Databricks logger used, all logging methods present, logger.flush and exit flush block implemented)
-- Splunk removal: PASS (No requests.post, splunk.prod.internal, or direct Splunk HTTP logging calls found)
-- Major function migration: FAIL (get_delta_data, log_and_load_data, write_parquet_data, and other major functions from reference file are missing in Output.py)
+- Logger migration (Splunk → Databricks) is present and correct in Output.py
+- Logger wrapper functions (debug/info/warn/error/fatal) are present
+- Logger flush and atexit block are present
+- Splunk logger and requests.post are removed
 
 Migration Remaining:
-- Implement all major data pipeline functions from reference file in Output.py
-- Add missing utility and logging functions
-- Ensure all logging states and wrapper usages are migrated
+- Major utility/data functions from the reference are missing in Output.py
+- Output.py does not implement get_delta_data, log_and_load_data, write_parquet_data, and other required functions
 
 Migration % Calculation:
-- Matched structures (import/class/logger/logging wrapper/logging methods/pseudonymization): 6
-- Total structures in reference file (import/class/logger/logging wrapper/logging methods/pseudonymization + major functions): 6 + 19 = 25
-- Migration % = (6 / 25) × 100 = 24%
+- Reference file has ~40+ major structures (functions/classes/imports/logger)
+- Output.py matches ~10 structures (logger, wrappers, pseudonymize, encrypt/decrypt, STSSession)
+- Migration % = (10 / 40) * 100 = 25%
 
-Code similarity percentage: ~40% (based on structural and function overlap, ignoring whitespace/comments)
-Missing functions: get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, filter_alpaca_consented_with_intermediate_df, add_cascade_id, get_csv_data, get_redshift_data, get_date_list, get_delta_metrics, delta_merge_file_status_update, log_job_start, log_job_skip, log_job_done, load_delta_table, update_column_datatype, add_null_app_deployed_uuid, write_data_with_partitions, log_and_write_data_with_partitions
-Modified functions: logging_wrapper (minor signature difference), logger initialization (migrated to Databricks)
+Code Similarity Percentage:
+- Low (~25-30%), as only logger and pseudonymization logic is present in Output.py
 
 Validation Status:
-INCOMPLETE
+Migration % < 50
+→ Validation Status: INCOMPLETE
 
 Validation status: FAIL
-
-Detected logging pattern: Databricks logger via %run, logging methods (debug, info, warn, error, fatal, flush), logger.flush on exit
-
-Migration verification result: Logger migration and Splunk removal successful. Major function migration incomplete.
-
+Detected logging pattern: Databricks logger (correct)
+Migration verification result: Logger migration is correct, but major utility/data functions are missing
 Issues found:
-- Major data pipeline and utility functions from reference file are missing in Output.py
-- Not all logging states and wrapper usages are migrated
-- Output.py does not fully implement the reference structure
+- Output.py is missing most of the required data utility and logging functions from the reference implementation
+- Only logger migration and pseudonymization logic are present
+- Splunk logger and requests.post are correctly removed
 
-Input which is migrated file, is written and update in repository.
-Validation output written and updated in in the repository.
+Summary:
+The logger migration is correct, but the migrated file is incomplete. Major functions and data utilities from the reference are missing. Migration is not sufficient for production use.
