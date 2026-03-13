@@ -176,7 +176,9 @@ print(log_data)
 
 # COMMAND ----------
 
-# Databricks logger initialization
+# --- SPLUNK LOGGER MIGRATION ---
+# MAGIC %run "./databricks_logger"
+
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -185,9 +187,7 @@ logger = DatabricksLogger(
     },
 )
 
-
 def __get_event(log_level, msg, data={}):
-    # adding log level and msg to event
     event = {"level": log_level, "message": msg}
     if isinstance(data, dict):
         event.update(data)
@@ -196,22 +196,17 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
-
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
-
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
-
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
 
-
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
-
 
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
@@ -915,6 +910,7 @@ def log_and_load_specific_version_delta_date(
 
 # COMMAND ----------
 
+# DBTITLE 1,Logger Flush on Exit
 import atexit
 
 def flush_logger_on_exit():
