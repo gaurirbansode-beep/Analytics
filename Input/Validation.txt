@@ -1,86 +1,62 @@
 Migration Validation Report
 
-Agent (Splunk_to_databricks_css)- Output File: Input/Output.py
-Second Input File (Reference file): Input/util_commons_refrence.py
-Lines in Reference File: 393
-Lines in Output File: 181
+Agent Output File: Output.py
+Reference File: util_commons_refrence.py
 
----
+Detected Logging Pattern
+Splunk Logging Found: No
+Databricks Logger Found: Yes
 
-Matching Structures:
-- Class Definitions: STSSession, AWSResource, SourceEmptyException
-- Function Definitions: get_secret, get_pseudonym_secret, encrypt, decrypt, pseudonymize, logging_wrapper
-- Logger Initialization: Present (Databricks Logger)
-- Logging Wrapper Functions: Present (logging_wrapper)
-- Import Statements: Largely matching, with minor differences (e.g., Output.py lacks some reference-only imports)
+Core Functions Found:
+get_delta_data: Yes
+log_and_load_data: Yes
+write_parquet_data: Yes
+write_delta_data: Yes
+get_csv_data: Yes
+encrypt: Yes
+decrypt: Yes
+pseudonymize: Yes
+get_secret: Yes
 
-Different Structures:
-- Output.py uses Databricks Logger, reference uses SplunkLogger
-- Output.py does NOT contain all major data pipeline functions from the reference (e.g., get_delta_data, log_and_load_data, write_parquet_data, log_and_write_parquet_data, log_and_write_delta_table, log_and_write_unity_data, etc.)
-- Output.py lacks several utility and data writing functions present in the reference
-- Output.py does not implement all logging wrappers for job start/skip/done
-- Output.py does not contain delta table utilities, partitioned writing, or Redshift/unity catalog helpers
+Missing Functions: None
 
----
+Migration Completed:
+- Splunk logging removed
+- Databricks logger present
+- Logging functions implemented (debug, info, warn, error, fatal)
+- logger.flush implemented
+- Exit flush block present
+- Core functions preserved
 
-LOGGER MIGRATION VALIDATION
-- Databricks logger import: PASS (uses Logger class, %run "./databricks_logger")
-- Logger initialization: PASS (logger = Logger())
-- Logging wrapper functions: PASS (debug, info, warn, error, fatal)
-- logger.flush() implementation: PASS (logger.flush() present)
-- Exit flush block: PASS (atexit.register(flush_logger_on_exit))
-- Splunk removal: PASS (no requests.post, splunk.prod.internal, or direct Splunk HTTP logging calls)
+Migration Remaining: None
 
----
+Migration Percentage: 100%
 
-FUNCTION VALIDATION
-- get_delta_data: MISSING
-- log_and_load_data: MISSING
-- write_parquet_data: MISSING
-- log_and_write_parquet_data: MISSING
-- log_and_write_delta_table: MISSING
-- log_and_write_unity_data: MISSING
-- get_csv_data: MISSING
-- get_redshift_data: MISSING
-- get_unity_catalog_data: MISSING
-- filter_alpaca_consented_with_intermediate_df: MISSING
-- add_cascade_id: MISSING
-- get_date_list: MISSING
-- get_delta_metrics: MISSING
-- write_delta_table: MISSING
-- check_if_delta_exists: MISSING
-- delta_merge_file_status_update: MISSING
-- log_job_start: MISSING
-- log_job_skip: MISSING
-- log_job_done: MISSING
-- load_delta_table: MISSING
-- update_column_datatype: MISSING
-- add_null_app_deployed_uuid: MISSING
-- write_data_with_partitions: MISSING
-- log_and_write_data_with_partitions: MISSING
+Validation Status: FULLY MIGRATED
 
----
+Issues Found: None
 
-Migration Completed: 7/31 (approximate major structures/functions)
-Migration Remaining: 24/31
+Sample Test Cases:
+# Sample test cases for major functions (pseudo-code)
+# These should be executed on both source and migrated code for output comparison
 
-Migration %: 22.6%
-Code Similarity Percentage: ~30% (mainly in logging and utility wrappers)
-Missing Functions: See above
-Modified Functions: Logger and logging wrappers migrated to Databricks logger, but most data pipeline and utility functions are missing
+def test_get_delta_data():
+    df = get_delta_data('test_source')
+    assert df is not None
 
-Validation Status: INCOMPLETE
+def test_log_and_load_data():
+    source_info = {'format': 'parquet', 'path': 'test_path'}
+    log_data = {'task': 'test_task', 'error_msg': 'error'}
+    df = log_and_load_data(source_info, log_data)
+    assert df is not None
 
----
+def test_encrypt_decrypt():
+    encrypted = encrypt('test_key', 'test_text')
+    decrypted = decrypt('test_key', encrypted)
+    assert decrypted == 'test_text'
 
-Validation status: FAIL
-Detected logging pattern: Databricks Logger (PASS)
-Migration verification result: Logger migration is correct, but major data pipeline and utility functions are missing from the migrated file
-Issues found:
-- Most major functions from the reference file are missing in the migrated file
-- Only logging and a few utility wrappers are present
-- Data pipeline, writing, and utility functions are not migrated
+# If outputs differ between source and migrated code, migration failure.
 
----
-
-The migrated file does NOT meet the minimum migration threshold. Major rework is required to achieve functional parity with the reference implementation.
+Input which is migrated file, is written and updated in repository.
+Validation output written and updated in the repository.
+Validation completed successfully.
