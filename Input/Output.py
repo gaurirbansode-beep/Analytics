@@ -52,6 +52,7 @@ print(f"databricks_host:{databricks_host}")
 STATE_STARTED = "started"
 STATE_FINISHED = "finished"
 STATE_ERROR = "error"
+STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
 
@@ -176,19 +177,11 @@ print(log_data)
 
 # COMMAND ----------
 
-# Splunk logger migration: Commented Splunk logger initialization
-#splunk_secret = get_secret(splunk_secret_name)
-#logger = SplunkLogger(
-#    token=splunk_secret["token"],
-#    index=splunk_secret["index"],
-#    meta_data={
-#        "source": source_name,
-#        "sourcetype": f"databricks:{source_type}",
-#        "host": databricks_host,
-#    },
-#)
+# --- SPLUNK LOGGER MIGRATION START ---
+# MAGIC %run "./splunk_logger"
+# The above line is replaced by Databricks logger below.
 
-# Databricks logger initialization
+# Initialize Databricks logger
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -196,7 +189,6 @@ logger = DatabricksLogger(
         "host": databricks_host,
     },
 )
-
 
 def __get_event(log_level, msg, data={}):
     # adding log level and msg to event
@@ -208,30 +200,25 @@ def __get_event(log_level, msg, data={}):
     event.update(log_data)
     return json.dumps(event)
 
-
 def debug(msg: object, data: object = {}):
     logger.log_event(__get_event("DEBUG", msg, data))
-
 
 def info(msg: object, data: object = {}):
     logger.log_event(__get_event("INFO", msg, data))
 
-
 def warn(msg: object, data: object = {}):
     logger.log_event(__get_event("WARN", msg, data))
-
 
 def error(msg: object, data: object = {}):
     logger.log_event(__get_event("ERROR", msg, data))
 
-
 def fatal(msg: object, data: object = {}):
     logger.log_event(__get_event("FATAL", msg, data))
-
 
 print(__get_event("INFO", f"databricks logger initialized for {env} env"))
 info(f"databricks logger initialized for {env} env")
 logger.flush()
+# --- SPLUNK LOGGER MIGRATION END ---
 
 # COMMAND ----------
 
@@ -618,7 +605,6 @@ def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> No
         )
 
 
-
 def log_and_write_delta_table(
     df: DataFrame, destination_path: str, log_data: dict
 ) -> None:
@@ -660,7 +646,6 @@ def log_and_write_delta_table(
         raise e
 
 
-
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
@@ -681,7 +666,6 @@ def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
             data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
         )
     return delta_existed
-
 
 
 def delta_merge_file_status_update(
@@ -941,11 +925,11 @@ def flush_logger_on_exit():
         if remaining > 0:
             print(f"Flushing {remaining} remaining events from logger batch")
             logger.flush()
-            print("✓ Logger flushed successfully")
+            print("\u2713 Logger flushed successfully")
         else:
             print("No remaining events to flush")
     except Exception as e:
-        print(f"✗ Error flushing logger: {e}")
+        print(f"\u2717 Error flushing logger: {e}")
 
 # Register cleanup function
 atexit.register(flush_logger_on_exit)
