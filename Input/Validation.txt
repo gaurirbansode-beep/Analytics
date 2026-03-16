@@ -4,101 +4,32 @@ Agent Output File: Output.py
 Reference File: util_commons_refrence.py
 
 Detected Logging Pattern
+-----------------------
 Splunk Logging Found: No
 Databricks Logger Found: Yes
 
-Core Functions Found:
-- get_delta_data
-- log_and_load_data
-- write_parquet_data
-- write_delta_data
-- get_csv_data
-- encrypt
-- decrypt
-- pseudonymize
-- get_secret
-
+Core Functions Found
+-------------------
+Found: get_delta_data, log_and_load_data, write_parquet_data, write_delta_data, get_csv_data, encrypt, decrypt, pseudonymize, get_secret
 Missing Functions: None
 
-Migration Completed:
-- Splunk logging removed
-- Databricks logger present
-- logging functions implemented (debug, info, warn, error, fatal)
-- logger.flush implemented
-- exit flush block present
-- core functions preserved
+Migration Completed
+-------------------
+• Splunk logging removed: Yes
+• Databricks logger present: Yes
+• Logging functions implemented (debug/info/warn/error/fatal): Yes
+• logger.flush implemented: Yes
+• Exit flush block present: Yes
+• Core functions preserved: Yes
 
-Migration Remaining: None
+Migration Percentage
+-------------------
+100%
 
-Migration Percentage: 100%
+Validation Status
+----------------
+FULLY MIGRATED
 
-Validation Status: FULLY MIGRATED
-
-Issues Found: None
-
-Sample Test Cases:
-
-# Test get_delta_data
-try:
-    df = get_delta_data('test_source')
-    print('get_delta_data executed successfully')
-except Exception as e:
-    print('get_delta_data failed:', e)
-
-# Test log_and_load_data
-try:
-    df = log_and_load_data({'format': 'delta', 'path': 'test_path'}, {'task': 'test_task', 'error_msg': 'test_error'})
-    print('log_and_load_data executed successfully')
-except Exception as e:
-    print('log_and_load_data failed:', e)
-
-# Test encrypt/decrypt
-try:
-    encrypted = encrypt('test_key', 'test_text')
-    decrypted = decrypt('test_key', encrypted)
-    print('encrypt/decrypt executed successfully')
-except Exception as e:
-    print('encrypt/decrypt failed:', e)
-
-# Test pseudonymize
-try:
-    df = pseudonymize(test_df, {'deviceId': 'test_key'})
-    print('pseudonymize executed successfully')
-except Exception as e:
-    print('pseudonymize failed:', e)
-
-# Test get_secret
-try:
-    secret = get_secret('test_secret')
-    print('get_secret executed successfully')
-except Exception as e:
-    print('get_secret failed:', e)
-
-# Test write_parquet_data
-try:
-    write_parquet_data(test_df, 'test_path', {'task': 'test_task', 'df_count': 1})
-    print('write_parquet_data executed successfully')
-except Exception as e:
-    print('write_parquet_data failed:', e)
-
-# Test write_delta_data
-try:
-    write_delta_data({'task': 'test_task', 'df_count': 1}, test_df, 'test_dest')
-    print('write_delta_data executed successfully')
-except Exception as e:
-    print('write_delta_data failed:', e)
-
-# Test get_csv_data
-try:
-    df = get_csv_data('test_source')
-    print('get_csv_data executed successfully')
-except Exception as e:
-    print('get_csv_data failed:', e)
-
-
-Test Execution Results:
-All sample test cases executed successfully on both source and migrated code. Outputs matched.
-
-Input which is migrated file, is written and updated in repository.
-Validation output written and updated in the repository.
-Validation completed successfully.
+Issues Found
+------------
+None
