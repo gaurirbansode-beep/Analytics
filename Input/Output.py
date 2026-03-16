@@ -52,9 +52,9 @@ print(f"databricks_host:{databricks_host}")
 STATE_STARTED = "started"
 STATE_FINISHED = "finished"
 STATE_ERROR = "error"
-STATE_SKIPPED = "skipped"
 
 # COMMAND ----------
+
 
 class STSSession:
     """
@@ -87,6 +87,7 @@ class STSSession:
 
 # COMMAND ----------
 
+
 class AWSResource:
     """
     Class to create objects related to particular services of AWS.
@@ -105,6 +106,7 @@ class AWSResource:
 
 
 # COMMAND ----------
+
 
 def get_secret(secret_name, region_name="us-west-2", session=boto3.session.Session()):
     """
@@ -174,8 +176,7 @@ print(log_data)
 
 # COMMAND ----------
 
-# --- SPLUNK LOGGER MIGRATION START ---
-# The following Splunk logger block is commented out and replaced by Databricks logger initialization
+# Splunk logger migration: Commented Splunk logger initialization
 #splunk_secret = get_secret(splunk_secret_name)
 #logger = SplunkLogger(
 #    token=splunk_secret["token"],
@@ -187,7 +188,7 @@ print(log_data)
 #    },
 #)
 
-# Databricks logger initialization (structure from reference)
+# Databricks logger initialization
 logger = DatabricksLogger(
     meta_data={
         "source": source_name,
@@ -297,6 +298,7 @@ def pseudonymize(df, col_map):
 
 
 # COMMAND ----------
+
 
 class SourceEmptyException(Exception):
     pass
@@ -545,6 +547,7 @@ def log_and_write_parquet_data(
 
 # COMMAND ----------
 
+
 def get_raw_date(raw_date, num_parts):
     processed_date = raw_date.split("-")
     if len(processed_date) != num_parts:
@@ -615,6 +618,7 @@ def write_delta_data(df: DataFrame, destination_path: str, log_data: dict) -> No
         )
 
 
+
 def log_and_write_delta_table(
     df: DataFrame, destination_path: str, log_data: dict
 ) -> None:
@@ -656,6 +660,7 @@ def log_and_write_delta_table(
         raise e
 
 
+
 def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
     delta_existed = None
     try:
@@ -676,6 +681,7 @@ def check_if_delta_exists(dest_bucket: str) -> Optional[bool]:
             data={"task": TASK_CHECK_DELTA_TABLE, "state": STATE_FINISHED},
         )
     return delta_existed
+
 
 
 def delta_merge_file_status_update(
@@ -935,14 +941,14 @@ def flush_logger_on_exit():
         if remaining > 0:
             print(f"Flushing {remaining} remaining events from logger batch")
             logger.flush()
-            print("\u2713 Logger flushed successfully")
+            print("✓ Logger flushed successfully")
         else:
             print("No remaining events to flush")
     except Exception as e:
-        print(f"\u2717 Error flushing logger: {e}")
+        print(f"✗ Error flushing logger: {e}")
 
 # Register cleanup function
 atexit.register(flush_logger_on_exit)
 
-info(f"Analytics commons initialize for {env} env")
+info(f"Clean room commons initialize for {env} env")
 logger.flush()
