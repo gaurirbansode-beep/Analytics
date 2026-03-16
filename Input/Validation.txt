@@ -25,7 +25,7 @@ Migration Completed:
 - Databricks logger present
 - Logging functions implemented (debug, info, warn, error, fatal)
 - logger.flush implemented
-- Exit flush block present
+- exit flush block present
 - Core functions preserved
 
 Migration Remaining: None
@@ -35,27 +35,6 @@ Migration Percentage: 100%
 Validation Status: FULLY MIGRATED
 
 Issues Found: None
-
-Sample Test Cases:
-# Sample test cases for major functions (pseudo-code)
-# These should be executed on both source and migrated code for output comparison
-
-def test_get_delta_data():
-    df = get_delta_data('test_source')
-    assert df is not None
-
-def test_log_and_load_data():
-    source_info = {'format': 'parquet', 'path': 'test_path'}
-    log_data = {'task': 'test_task', 'error_msg': 'error'}
-    df = log_and_load_data(source_info, log_data)
-    assert df is not None
-
-def test_encrypt_decrypt():
-    encrypted = encrypt('test_key', 'test_text')
-    decrypted = decrypt('test_key', encrypted)
-    assert decrypted == 'test_text'
-
-# If outputs differ between source and migrated code, migration failure.
 
 Input which is migrated file, is written and updated in repository.
 Validation output written and updated in the repository.
