@@ -1,1 +1,1 @@
-Migrated content with Databricks logging replacing Splunk logging
+Migrated content with Splunk replaced by Databricks logging
